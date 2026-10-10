@@ -669,11 +669,10 @@ function HomeScreen({
             href={`https://wa.me/${waContext.botPhone}?text=Hi`}
             target="_blank"
             rel="noopener noreferrer"
-            aria-label="Order on WhatsApp with Hi"
-            className="flex items-center gap-1.5 rounded-full bg-[#25D366] px-3.5 py-1.5 text-xs font-bold text-white shadow-card transition active:scale-95 hover:brightness-105"
+            aria-label="Chat on WhatsApp"
+            className="grid h-8 w-8 place-items-center rounded-full bg-[#25D366] text-white shadow-card transition active:scale-90 hover:brightness-105"
           >
             <WhatsAppIcon className="h-4 w-4 fill-current" />
-            <span>Chat Hi</span>
           </a>
         </div>
         <img src={basket} alt="" width={1024} height={1024} className="absolute -bottom-3 -right-4 w-36 sm:w-40 pointer-events-none" />
