@@ -78,40 +78,165 @@ function WhatsAppIcon({ className = "" }: { className?: string }) {
   );
 }
 
-type BeforeInstallPromptEvent = Event & { prompt: () => Promise<void>; userChoice: Promise<{ outcome: string }> };
+type BeforeInstallPromptEvent = Event & {
+  prompt: () => Promise<void>;
+  userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
+};
+
+// Global prompt capture so the event is NEVER missed during early load/splash screen
+declare global {
+  interface Window {
+    __pwaInstallPrompt?: BeforeInstallPromptEvent | null;
+  }
+}
+
+let globalPrompt: BeforeInstallPromptEvent | null =
+  typeof window !== "undefined" ? window.__pwaInstallPrompt ?? null : null;
+const promptListeners = new Set<(e: BeforeInstallPromptEvent | null) => void>();
+
+if (typeof window !== "undefined") {
+  if (window.__pwaInstallPrompt) {
+    globalPrompt = window.__pwaInstallPrompt;
+  }
+  window.addEventListener("beforeinstallprompt", (e: Event) => {
+    e.preventDefault();
+    globalPrompt = e as BeforeInstallPromptEvent;
+    window.__pwaInstallPrompt = globalPrompt;
+    promptListeners.forEach((cb) => cb(globalPrompt));
+  });
+
+  window.addEventListener("appinstalled", () => {
+    globalPrompt = null;
+    window.__pwaInstallPrompt = null;
+    promptListeners.forEach((cb) => cb(null));
+  });
+}
 
 function usePwaInstall() {
-  const [deferred, setDeferred] = useState<BeforeInstallPromptEvent | null>(null);
-  const [installed, setInstalled] = useState(false);
+  const [deferred, setDeferred] = useState<BeforeInstallPromptEvent | null>(
+    () => globalPrompt || (typeof window !== "undefined" ? window.__pwaInstallPrompt ?? null : null)
+  );
+  const [showIosSheet, setShowIosSheet] = useState(false);
+  const [installed, setInstalled] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return (
+      window.matchMedia("(display-mode: standalone)").matches ||
+      (window.navigator as unknown as { standalone?: boolean }).standalone === true
+    );
+  });
+
   useEffect(() => {
-    const onPrompt = (e: Event) => { e.preventDefault(); setDeferred(e as BeforeInstallPromptEvent); };
-    const onInstalled = () => setInstalled(true);
-    window.addEventListener("beforeinstallprompt", onPrompt);
-    window.addEventListener("appinstalled", onInstalled);
-    return () => { window.removeEventListener("beforeinstallprompt", onPrompt); window.removeEventListener("appinstalled", onInstalled); };
-  }, []);
+    // If prompt was captured early
+    if (typeof window !== "undefined" && window.__pwaInstallPrompt && !deferred) {
+      setDeferred(window.__pwaInstallPrompt);
+    }
+
+    const onPrompt = (p: BeforeInstallPromptEvent | null) => setDeferred(p);
+    promptListeners.add(onPrompt);
+
+    const checkStandalone = () => {
+      if (
+        window.matchMedia("(display-mode: standalone)").matches ||
+        (window.navigator as unknown as { standalone?: boolean }).standalone === true
+      ) {
+        setInstalled(true);
+      }
+    };
+    window.addEventListener("appinstalled", checkStandalone);
+    return () => {
+      promptListeners.delete(onPrompt);
+      window.removeEventListener("appinstalled", checkStandalone);
+    };
+  }, [deferred]);
+
   const install = async () => {
-    if (deferred) {
-      await deferred.prompt();
-      const { outcome } = await deferred.userChoice;
-      if (outcome === "accepted") setDeferred(null);
+    const prompt =
+      deferred ||
+      globalPrompt ||
+      (typeof window !== "undefined" ? window.__pwaInstallPrompt ?? null : null);
+
+    if (prompt) {
+      await prompt.prompt();
+      const choice = await prompt.userChoice;
+      if (choice.outcome === "accepted") {
+        globalPrompt = null;
+        if (typeof window !== "undefined") {
+          window.__pwaInstallPrompt = null;
+        }
+        setDeferred(null);
+        setInstalled(true);
+      }
     } else {
-      window.alert("To install Snalo: open your browser menu and choose \"Add to Home Screen\" / \"Install app\".");
+      const isIos =
+        typeof navigator !== "undefined" &&
+        /iPad|iPhone|iPod/.test(navigator.userAgent) &&
+        !(window as unknown as { MSStream?: unknown }).MSStream;
+      if (isIos) {
+        setShowIosSheet(true);
+      }
     }
   };
-  return { install, installed };
+
+  return { install, installed, showIosSheet, closeIosSheet: () => setShowIosSheet(false) };
 }
 
 function InstallButton() {
-  const { install, installed } = usePwaInstall();
+  const { install, installed, showIosSheet, closeIosSheet } = usePwaInstall();
   if (installed) return null;
+
   return (
-    <button
-      onClick={install}
-      className="absolute right-4 top-[max(env(safe-area-inset-top),1rem)] z-20 flex items-center gap-1.5 rounded-full bg-foreground/90 backdrop-blur px-3.5 py-2 text-xs font-semibold text-background shadow-lg transition active:scale-95"
-    >
-      <Download className="h-3.5 w-3.5" /> Install app
-    </button>
+    <>
+      <button
+        onClick={install}
+        className="absolute right-4 top-[max(env(safe-area-inset-top),1rem)] z-20 flex items-center gap-1.5 rounded-full bg-foreground/90 backdrop-blur px-3.5 py-2 text-xs font-semibold text-background shadow-lg transition active:scale-95"
+      >
+        <Download className="h-3.5 w-3.5" /> Install app
+      </button>
+
+      {showIosSheet && (
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in"
+          onClick={closeIosSheet}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-sm rounded-3xl bg-card p-5 text-card-foreground shadow-2xl animate-in slide-in-from-bottom"
+          >
+            <div className="flex items-center gap-3">
+              <Logo className="h-12 w-12 rounded-2xl" />
+              <div>
+                <h3 className="font-bold text-base">Install Snalo App</h3>
+                <p className="text-xs text-muted-foreground">Add to home screen for full app experience</p>
+              </div>
+            </div>
+            <div className="my-4 space-y-2.5 rounded-2xl bg-muted/60 p-3.5 text-xs text-foreground">
+              <div className="flex items-center gap-2.5">
+                <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-primary text-primary-foreground font-bold text-[10px]">
+                  1
+                </span>
+                <span>
+                  Tap the <strong className="font-semibold">Share</strong> button in your browser
+                </span>
+              </div>
+              <div className="flex items-center gap-2.5">
+                <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-primary text-primary-foreground font-bold text-[10px]">
+                  2
+                </span>
+                <span>
+                  Choose <strong className="font-semibold">Add to Home Screen</strong>
+                </span>
+              </div>
+            </div>
+            <button
+              onClick={closeIosSheet}
+              className="w-full rounded-2xl bg-primary py-3 font-semibold text-sm text-primary-foreground transition active:scale-[0.98]"
+            >
+              Got it
+            </button>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
 
