@@ -145,11 +145,20 @@
 @layer base {
   * {
     border-color: var(--color-border);
+    -webkit-tap-highlight-color: transparent;
   }
 
-  body {
+  html, body {
+    height: 100%;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
     background-color: var(--color-background);
     color: var(--color-foreground);
+    overscroll-behavior-y: none;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
 }
 
@@ -157,3 +166,6 @@
 @utility no-scrollbar { scrollbar-width: none; &::-webkit-scrollbar { display: none; } }
 @keyframes ride { 0%,100% { transform: translateY(0) } 50% { transform: translateY(-6px) } }
 @utility animate-ride { animation: ride 2.4s ease-in-out infinite; }
+@utility pt-safe { padding-top: max(env(safe-area-inset-top), 1rem); }
+@utility pb-safe { padding-bottom: max(env(safe-area-inset-bottom), 1rem); }
+

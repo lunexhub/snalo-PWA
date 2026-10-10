@@ -59,12 +59,10 @@ export default function SnaloApp() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-accent/60 p-0 sm:p-8">
-      <div className="relative h-[100dvh] w-full overflow-hidden bg-background sm:h-[820px] sm:w-[390px] sm:rounded-[3rem] sm:border-[10px] sm:border-foreground sm:shadow-phone">
-        <div className="flex h-full flex-col">
-          <div className="min-h-0 flex-1 overflow-y-auto no-scrollbar">{body}</div>
-          {tabbed && <TabBar screen={screen} go={go} count={count} />}
-        </div>
+    <div className="flex h-[100dvh] w-full items-center justify-center bg-background sm:bg-muted/30 p-0 sm:p-4 md:p-6 overflow-hidden select-none">
+      <div className="relative flex h-full w-full max-w-md flex-col overflow-hidden bg-background sm:h-[844px] sm:max-h-[92vh] sm:rounded-[2.5rem] sm:border-[8px] sm:border-foreground/90 sm:shadow-phone">
+        <div className="min-h-0 flex-1 overflow-y-auto no-scrollbar overscroll-contain">{body}</div>
+        {tabbed && <TabBar screen={screen} go={go} count={count} />}
         {drawer && <Drawer go={go} close={() => setDrawer(false)} />}
       </div>
     </div>
@@ -110,20 +108,20 @@ function InstallButton() {
   return (
     <button
       onClick={install}
-      className="absolute right-5 top-6 z-20 flex items-center gap-2 rounded-full bg-foreground px-4 py-3 text-sm font-semibold text-background shadow-phone transition active:scale-95"
+      className="absolute right-4 top-[max(env(safe-area-inset-top),1rem)] z-20 flex items-center gap-1.5 rounded-full bg-foreground/90 backdrop-blur px-3.5 py-2 text-xs font-semibold text-background shadow-lg transition active:scale-95"
     >
-      <Download className="h-4 w-4" /> Install app
+      <Download className="h-3.5 w-3.5" /> Install app
     </button>
   );
 }
 
 function Header({ title, sub, back, right }: { title: string; sub?: string; back: () => void; right?: ReactNode }) {
   return (
-    <div className="sticky top-0 z-10 flex items-center gap-3 bg-background/95 px-5 pb-3 pt-6 backdrop-blur">
-      <button onClick={back} aria-label="Back" className="rounded-full p-1 hover:bg-muted"><ArrowLeft className="h-5 w-5" /></button>
-      <div className="flex-1">
-        {sub && <p className="text-xs text-muted-foreground">{sub}</p>}
-        <h1 className="text-lg font-bold">{title}</h1>
+    <div className="sticky top-0 z-10 flex items-center gap-3 bg-background/95 px-5 pb-3 pt-[max(env(safe-area-inset-top),1.25rem)] backdrop-blur">
+      <button onClick={back} aria-label="Back" className="rounded-full p-2 hover:bg-muted active:scale-90 transition"><ArrowLeft className="h-5 w-5" /></button>
+      <div className="flex-1 min-w-0">
+        {sub && <p className="text-xs text-muted-foreground truncate">{sub}</p>}
+        <h1 className="text-lg font-bold truncate leading-tight">{title}</h1>
       </div>
       {right}
     </div>
@@ -160,10 +158,10 @@ function ProductCard({ p, onAdd }: { p: Product; onAdd: () => void }) {
 /* ---------- screens ---------- */
 function Splash() {
   return (
-    <div className="flex h-full flex-col items-center justify-center gap-4 bg-primary text-primary-foreground">
+    <div className="flex h-full flex-col items-center justify-center gap-4 bg-primary text-primary-foreground select-none px-6 text-center">
       <Logo className="h-24 w-24" />
-      <h1 className="text-2xl font-bold">Snalo Fast Delivery</h1>
-      <p className="text-sm opacity-80">Fast Grocery Delivery</p>
+      <h1 className="text-2xl font-bold tracking-tight">Snalo Fast Delivery</h1>
+      <p className="text-sm opacity-85">Fast Grocery Delivery</p>
       <div className="mt-8 h-7 w-7 animate-spin rounded-full border-2 border-primary-foreground/30 border-t-primary-foreground" />
     </div>
   );
@@ -171,20 +169,22 @@ function Splash() {
 
 function Welcome({ go }: { go: (s: Screen) => void }) {
   return (
-    <div className="relative flex h-full flex-col bg-primary text-primary-foreground">
-      <div className="absolute -right-16 top-24 h-56 w-56 rounded-full bg-warning/60" />
-      <div className="relative px-6 pt-16 text-center">
-        <h1 className="text-6xl font-extrabold tracking-tight">Snalo</h1>
-        <p className="mt-1 text-sm font-medium tracking-[0.3em]">FAST DELIVERY</p>
-        <p className="mt-6 text-lg">Groceries, Foods & More<br />Delivered Fast to Your Door</p>
-      </div>
-      <img src={rider} alt="Snalo delivery rider" width={1024} height={1024} className="relative mx-auto mt-4 w-72 animate-ride" />
-      <div className="mt-auto rounded-t-[2rem] bg-background px-6 pb-8 pt-6 text-center text-foreground">
-        <div className="mb-5 flex justify-center gap-1.5"><span className="h-1.5 w-6 rounded-full bg-primary" /><span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/30" /><span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/30" /></div>
-        <PrimaryBtn onClick={() => go("login")}>Get Started <ChevronRight className="h-5 w-5" /></PrimaryBtn>
-        <p className="mt-4 text-sm text-muted-foreground">Already have an account? <button onClick={() => go("login")} className="font-semibold text-primary">Login</button></p>
-      </div>
+    <div className="relative flex h-full flex-col bg-primary text-primary-foreground overflow-hidden">
+      <div className="absolute -right-16 top-24 h-56 w-56 rounded-full bg-warning/60 pointer-events-none" />
       <InstallButton />
+      <div className="relative px-6 pt-[max(env(safe-area-inset-top),2.5rem)] text-center">
+        <h1 className="text-5xl sm:text-6xl font-extrabold tracking-tight">Snalo</h1>
+        <p className="mt-1 text-xs sm:text-sm font-semibold tracking-[0.3em]">FAST DELIVERY</p>
+        <p className="mt-3 text-base sm:text-lg opacity-95">Groceries, Foods & More<br />Delivered Fast to Your Door</p>
+      </div>
+      <div className="relative my-auto flex flex-1 items-center justify-center py-2 min-h-0">
+        <img src={rider} alt="Snalo delivery rider" width={1024} height={1024} className="h-auto max-h-[30vh] w-auto max-w-[240px] sm:max-w-[280px] object-contain animate-ride" />
+      </div>
+      <div className="mt-auto rounded-t-[2rem] bg-background px-6 pb-[max(env(safe-area-inset-bottom),1.75rem)] pt-6 text-center text-foreground shadow-lg">
+        <div className="mb-4 flex justify-center gap-1.5"><span className="h-1.5 w-6 rounded-full bg-primary" /><span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/30" /><span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/30" /></div>
+        <PrimaryBtn onClick={() => go("login")}>Get Started <ChevronRight className="h-5 w-5" /></PrimaryBtn>
+        <p className="mt-3.5 text-sm text-muted-foreground">Already have an account? <button onClick={() => go("login")} className="font-semibold text-primary">Login</button></p>
+      </div>
     </div>
   );
 }
@@ -194,25 +194,25 @@ function Login({ go }: { go: (s: Screen) => void }) {
   const [email, setEmail] = useState("johnsmith@gmail.com");
   const [pw, setPw] = useState("password");
   return (
-    <div className="flex h-full flex-col px-6 pt-20">
-      <div className="mx-auto grid h-16 w-16 place-items-center rounded-2xl bg-accent text-primary"><Bike className="h-8 w-8" /></div>
-      <h1 className="mt-6 text-center text-2xl font-bold">Welcome Back</h1>
+    <div className="flex h-full flex-col px-6 pt-[max(env(safe-area-inset-top),2rem)] pb-[max(env(safe-area-inset-bottom),1.5rem)] overflow-y-auto no-scrollbar">
+      <InstallButton />
+      <div className="mx-auto mt-4 grid h-16 w-16 place-items-center rounded-2xl bg-accent text-primary shadow-sm"><Bike className="h-8 w-8" /></div>
+      <h1 className="mt-5 text-center text-2xl font-bold">Welcome Back</h1>
       <p className="mt-1 text-center text-sm text-muted-foreground">Login to continue your delivery journey</p>
-      <form onSubmit={(e) => { e.preventDefault(); go("home"); }} className="mt-8 space-y-3">
+      <form onSubmit={(e) => { e.preventDefault(); go("home"); }} className="mt-6 space-y-3">
         <label className="flex items-center gap-3 rounded-2xl bg-muted px-4 py-3.5">
-          <Mail className="h-5 w-5 text-primary" />
+          <Mail className="h-5 w-5 text-primary shrink-0" />
           <input value={email} onChange={(e) => setEmail(e.target.value)} type="email" placeholder="Email Address" className="flex-1 bg-transparent text-sm outline-none" />
         </label>
         <label className="flex items-center gap-3 rounded-2xl bg-muted px-4 py-3.5">
-          <Lock className="h-5 w-5 text-primary" />
+          <Lock className="h-5 w-5 text-primary shrink-0" />
           <input value={pw} onChange={(e) => setPw(e.target.value)} type={show ? "text" : "password"} placeholder="Password" className="flex-1 bg-transparent text-sm outline-none" />
-          <button type="button" onClick={() => setShow(!show)} aria-label="Toggle password">{show ? <EyeOff className="h-5 w-5 text-muted-foreground" /> : <Eye className="h-5 w-5 text-muted-foreground" />}</button>
+          <button type="button" onClick={() => setShow(!show)} aria-label="Toggle password" className="p-1"><Eye className="h-5 w-5 text-muted-foreground" /></button>
         </label>
         <p className="text-right text-xs font-semibold text-primary">Forgot Password?</p>
         <div className="pt-2"><PrimaryBtn>Login</PrimaryBtn></div>
       </form>
-      <p className="mt-6 text-center text-sm text-muted-foreground">Don't have an account? <button onClick={() => go("home")} className="font-semibold text-primary">Sign Up</button></p>
-      <InstallButton />
+      <p className="mt-auto pt-6 text-center text-sm text-muted-foreground">Don't have an account? <button onClick={() => go("home")} className="font-semibold text-primary">Sign Up</button></p>
     </div>
   );
 }
@@ -221,65 +221,65 @@ type ShopProps = { go: (s: Screen) => void; add: (id: string) => void; cart: Rec
 
 function HomeScreen({ go, add, count, openDrawer }: ShopProps & { openDrawer: () => void }) {
   return (
-    <div className="px-5 pb-6 pt-6">
+    <div className="px-5 pb-6 pt-[max(env(safe-area-inset-top),1.25rem)]">
       <div className="flex items-center gap-3">
-        <button onClick={openDrawer} aria-label="Menu"><Menu className="h-6 w-6" /></button>
-        <div className="flex-1">
-          <p className="text-xs text-muted-foreground">Deliver to</p>
-          <p className="flex items-center gap-1 font-bold"><MapPin className="h-4 w-4 text-primary" />Johannesburg, SA</p>
+        <button onClick={openDrawer} aria-label="Menu" className="rounded-full p-2 hover:bg-muted active:scale-90 transition"><Menu className="h-6 w-6" /></button>
+        <div className="flex-1 min-w-0">
+          <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Deliver to</p>
+          <p className="flex items-center gap-1 font-bold text-sm truncate"><MapPin className="h-4 w-4 text-primary shrink-0" />Johannesburg, SA</p>
         </div>
-        <button onClick={() => go("notifications")} aria-label="Notifications" className="relative rounded-full p-2 hover:bg-muted">
+        <button onClick={() => go("notifications")} aria-label="Notifications" className="relative rounded-full p-2 hover:bg-muted active:scale-90 transition">
           <Bell className="h-5 w-5" /><span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-primary" />
         </button>
         <CartBtn count={count} go={go} />
       </div>
-      <button onClick={() => go("products")} className="mt-4 flex w-full items-center gap-3 rounded-2xl bg-muted px-4 py-3 text-sm text-muted-foreground"><Search className="h-4 w-4 text-primary" />Search groceries...</button>
+      <button onClick={() => go("products")} className="mt-4 flex w-full items-center gap-3 rounded-2xl bg-muted px-4 py-3 text-sm text-muted-foreground active:scale-[0.99] transition"><Search className="h-4 w-4 text-primary" />Search groceries...</button>
 
       <div className="relative mt-4 overflow-hidden rounded-3xl bg-promo p-5 text-primary-foreground">
-        <h2 className="max-w-[60%] text-xl font-extrabold leading-tight">FAST DELIVERY AT YOUR DOORSTEP</h2>
+        <h2 className="max-w-[62%] text-lg sm:text-xl font-extrabold leading-tight">FAST DELIVERY AT YOUR DOORSTEP</h2>
         <p className="mt-1 text-xs opacity-90">Groceries, Foods & More</p>
         <div className="mt-3 flex items-center gap-2">
-          <button onClick={() => go("products")} className="rounded-full bg-background px-4 py-1.5 text-xs font-semibold text-primary">Order Now →</button>
+          <button onClick={() => go("products")} className="rounded-full bg-background px-4 py-1.5 text-xs font-semibold text-primary active:scale-95 transition">Order Now →</button>
           <a href="https://wa.me/27821234567?text=Hi%2C%20I%27d%20like%20to%20order%20groceries" target="_blank" rel="noopener noreferrer" aria-label="Order on WhatsApp" className="grid h-8 w-8 place-items-center rounded-full bg-success text-primary-foreground shadow-card transition active:scale-90"><WhatsAppIcon className="h-4 w-4" /></a>
         </div>
-        <img src={basket} alt="" width={1024} height={1024} className="absolute -bottom-3 -right-4 w-40" />
+        <img src={basket} alt="" width={1024} height={1024} className="absolute -bottom-3 -right-4 w-36 sm:w-40 pointer-events-none" />
       </div>
 
       <Section title="Categories" onAll={() => go("products")} />
-      <div className="grid grid-cols-4 gap-3">
+      <div className="flex gap-2.5 overflow-x-auto no-scrollbar pb-1">
         {CATS.map((c) => (
-          <button key={c.n} onClick={() => go("products")} className="flex flex-col items-center gap-1 rounded-2xl bg-card py-3 shadow-card">
-            <span className="text-3xl">{c.e}</span><span className="text-[11px] font-medium">{c.n}</span>
+          <button key={c.n} onClick={() => go("products")} className="flex min-w-[76px] flex-1 flex-col items-center gap-1.5 rounded-2xl bg-card py-3 px-2 shadow-card transition active:scale-95">
+            <span className="text-2xl">{c.e}</span><span className="text-[11px] font-semibold whitespace-nowrap">{c.n}</span>
           </button>
         ))}
       </div>
 
       <Section title="Best Selling" onAll={() => go("products")} />
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-3 gap-2.5 sm:gap-3">
         {PRODUCTS.slice(0, 3).map((p) => (
-          <div key={p.id} className="rounded-2xl bg-card p-2.5 shadow-card">
+          <div key={p.id} className="rounded-2xl bg-card p-2.5 shadow-card flex flex-col justify-between">
             <div className="grid place-items-center"><img src={p.img} alt={p.name} loading="lazy" className="h-16 w-full object-contain" /></div>
             <p className="mt-1 truncate text-xs font-semibold">{p.name}</p>
             <p className="text-[10px] text-muted-foreground">{p.unit}</p>
             <div className="mt-1 flex items-center justify-between">
-              <span className="text-sm font-bold">R {p.price}</span>
-              <button onClick={() => add(p.id)} aria-label={`Add ${p.name}`} className="grid h-6 w-6 place-items-center rounded-full bg-primary text-primary-foreground"><Plus className="h-3.5 w-3.5" /></button>
+              <span className="text-xs sm:text-sm font-bold">R {p.price}</span>
+              <button onClick={() => add(p.id)} aria-label={`Add ${p.name}`} className="grid h-6 w-6 place-items-center rounded-full bg-primary text-primary-foreground active:scale-90 transition"><Plus className="h-3.5 w-3.5" /></button>
             </div>
           </div>
         ))}
       </div>
 
       <div className="mt-4 flex items-center gap-3 rounded-2xl bg-accent p-3">
-        <Truck className="h-6 w-6 text-primary" />
+        <Truck className="h-6 w-6 text-primary shrink-0" />
         <div className="flex-1"><p className="text-sm font-bold text-primary">FREE DELIVERY</p><p className="text-xs text-muted-foreground">On orders above R150</p></div>
-        <button onClick={() => go("products")} className="rounded-full bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground">Shop Now</button>
+        <button onClick={() => go("products")} className="rounded-full bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground active:scale-95 transition">Shop Now</button>
       </div>
 
       <Section title="Popular Shops" />
-      <div className="grid grid-cols-4 gap-3">
+      <div className="flex gap-2.5 overflow-x-auto no-scrollbar pb-1">
         {SHOPS.map((s) => (
-          <button key={s} onClick={() => go("products")} className="flex flex-col items-center gap-1 rounded-2xl bg-card py-3 shadow-card transition hover:brightness-95 active:scale-95">
-            <Store className="h-6 w-6 text-primary" /><span className="text-[10px] font-semibold">{s}</span>
+          <button key={s} onClick={() => go("products")} className="flex min-w-[88px] flex-1 flex-col items-center gap-1.5 rounded-2xl bg-card p-3 shadow-card transition hover:brightness-95 active:scale-95 shrink-0">
+            <Store className="h-6 w-6 text-primary" /><span className="text-[11px] font-semibold whitespace-nowrap">{s}</span>
           </button>
         ))}
       </div>
@@ -410,31 +410,33 @@ function Tracking({ go }: { go: (s: Screen) => void }) {
   useEffect(() => { const t = setTimeout(() => setStep(3), 8000); return () => clearTimeout(t); }, []);
   const steps = [["Placed", "10:10 AM"], ["Preparing", "10:20 AM"], ["On Way", "10:30 AM"], ["Delivered", ""]];
   return (
-    <div className="relative h-full">
-      <svg viewBox="0 0 390 500" className="absolute inset-0 h-[65%] w-full bg-muted" preserveAspectRatio="xMidYMid slice">
-        {[60, 140, 230, 320].map((x) => <rect key={x} x={x} y="0" width="14" height="500" className="fill-background" />)}
-        {[80, 190, 300, 410].map((y) => <rect key={y} x="0" y={y} width="390" height="14" className="fill-background" />)}
-        <rect x="160" y="210" width="60" height="70" rx="6" className="fill-success/20" />
-        <path d="M250 0 Q280 120 360 160 T390 300" className="fill-none stroke-chart-3/30" strokeWidth="18" />
-        <path d="M90 110 Q150 200 200 250 T290 390" className="fill-none stroke-primary" strokeWidth="4" strokeLinecap="round" />
-      </svg>
-      <div className="absolute left-[18%] top-[13%] grid h-10 w-10 place-items-center rounded-full bg-warning text-primary-foreground shadow-card"><Store className="h-5 w-5" /></div>
-      <div className={`absolute grid h-12 w-12 place-items-center rounded-full bg-primary text-primary-foreground shadow-card ring-4 ring-primary/25 transition-all duration-[7000ms] ${step === 3 ? "left-[68%] top-[48%]" : "left-[46%] top-[30%]"}`}><Bike className="h-6 w-6" /></div>
-      <div className="absolute left-[72%] top-[50%] grid h-10 w-10 place-items-center rounded-full bg-success text-primary-foreground shadow-card"><Home className="h-5 w-5" /></div>
-      <button onClick={() => go("home")} aria-label="Back" className="absolute left-5 top-6 grid h-10 w-10 place-items-center rounded-full bg-background shadow-card"><ArrowLeft className="h-5 w-5" /></button>
+    <div className="relative h-full flex flex-col overflow-hidden">
+      <div className="relative flex-1 min-h-[280px] w-full bg-muted overflow-hidden">
+        <svg viewBox="0 0 390 500" className="absolute inset-0 h-full w-full bg-muted" preserveAspectRatio="xMidYMid slice">
+          {[60, 140, 230, 320].map((x) => <rect key={x} x={x} y="0" width="14" height="500" className="fill-background" />)}
+          {[80, 190, 300, 410].map((y) => <rect key={y} x="0" y={y} width="390" height="14" className="fill-background" />)}
+          <rect x="160" y="210" width="60" height="70" rx="6" className="fill-success/20" />
+          <path d="M250 0 Q280 120 360 160 T390 300" className="fill-none stroke-chart-3/30" strokeWidth="18" />
+          <path d="M90 110 Q150 200 200 250 T290 390" className="fill-none stroke-primary" strokeWidth="4" strokeLinecap="round" />
+        </svg>
+        <div className="absolute left-[18%] top-[25%] grid h-10 w-10 place-items-center rounded-full bg-warning text-primary-foreground shadow-card"><Store className="h-5 w-5" /></div>
+        <div className={`absolute grid h-12 w-12 place-items-center rounded-full bg-primary text-primary-foreground shadow-card ring-4 ring-primary/25 transition-all duration-[7000ms] ${step === 3 ? "left-[68%] top-[55%]" : "left-[46%] top-[38%]"}`}><Bike className="h-6 w-6" /></div>
+        <div className="absolute left-[72%] top-[57%] grid h-10 w-10 place-items-center rounded-full bg-success text-primary-foreground shadow-card"><Home className="h-5 w-5" /></div>
+        <button onClick={() => go("home")} aria-label="Back" className="absolute left-4 top-[max(env(safe-area-inset-top),1.25rem)] grid h-10 w-10 place-items-center rounded-full bg-background shadow-card active:scale-90 transition"><ArrowLeft className="h-5 w-5" /></button>
+      </div>
 
-      <div className="absolute inset-x-0 bottom-0 rounded-t-[2rem] bg-background p-5 shadow-phone">
+      <div className="rounded-t-[2rem] bg-background p-5 pb-[max(env(safe-area-inset-bottom),1.5rem)] shadow-phone shrink-0">
         <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-muted" />
         <span className="rounded-full bg-success/15 px-3 py-1 text-[10px] font-bold text-success">● LIVE TRACKING</span>
         <div className="mt-3 flex items-center gap-3">
-          <div className="grid h-12 w-12 place-items-center rounded-xl bg-accent text-primary"><Bike className="h-6 w-6" /></div>
+          <div className="grid h-12 w-12 place-items-center rounded-xl bg-accent text-primary shrink-0"><Bike className="h-6 w-6" /></div>
           <div><p className="font-bold">{step === 3 ? "Order Delivered!" : "Order On The Way"}</p><p className="text-xs text-muted-foreground">{step === 3 ? "Enjoy your groceries" : <>Arriving in <span className="font-semibold text-primary">15 mins</span></>}</p></div>
         </div>
         <div className="mt-4 flex items-center gap-3 rounded-2xl bg-muted p-3">
-          <div className="grid h-10 w-10 place-items-center rounded-full bg-primary text-primary-foreground"><User className="h-5 w-5" /></div>
-          <div className="flex-1"><p className="text-sm font-semibold">John Rider</p><p className="text-xs text-muted-foreground">Delivery Partner</p></div>
-          <a href="tel:+27821234567" aria-label="Call rider" className="grid h-9 w-9 place-items-center rounded-full bg-primary text-primary-foreground"><Phone className="h-4 w-4" /></a>
-          <a href="https://wa.me/27821234567?text=Hi%2C%20I%27m%20asking%20about%20my%20Snalo%20order" target="_blank" rel="noopener noreferrer" aria-label="Chat on WhatsApp" className="grid h-9 w-9 place-items-center rounded-full bg-success text-primary-foreground"><WhatsAppIcon className="h-4 w-4" /></a>
+          <div className="grid h-10 w-10 place-items-center rounded-full bg-primary text-primary-foreground shrink-0"><User className="h-5 w-5" /></div>
+          <div className="flex-1 min-w-0"><p className="text-sm font-semibold truncate">John Rider</p><p className="text-xs text-muted-foreground">Delivery Partner</p></div>
+          <a href="tel:+27821234567" aria-label="Call rider" className="grid h-9 w-9 place-items-center rounded-full bg-primary text-primary-foreground active:scale-90 transition"><Phone className="h-4 w-4" /></a>
+          <a href="https://wa.me/27821234567?text=Hi%2C%20I%27m%20asking%20about%20my%20Snalo%20order" target="_blank" rel="noopener noreferrer" aria-label="Chat on WhatsApp" className="grid h-9 w-9 place-items-center rounded-full bg-success text-primary-foreground active:scale-90 transition"><WhatsAppIcon className="h-4 w-4" /></a>
         </div>
         <div className="mt-5 flex justify-between">
           {steps.map(([l, t], i) => (
@@ -458,7 +460,7 @@ function Profile({ go }: { go: (s: Screen) => void }) {
     { t: "Help & Support", I: HelpCircle }, { t: "Settings", I: Settings },
   ];
   return (
-    <div className="px-5 pb-6 pt-8">
+    <div className="px-5 pb-6 pt-[max(env(safe-area-inset-top),2rem)]">
       <h1 className="text-center text-lg font-bold">Profile</h1>
       <div className="mx-auto mt-6 grid h-24 w-24 place-items-center rounded-full bg-primary text-primary-foreground ring-8 ring-accent"><User className="h-12 w-12" /></div>
       <p className="mt-4 text-center text-xl font-bold">John Smith</p>
@@ -472,7 +474,7 @@ function Profile({ go }: { go: (s: Screen) => void }) {
 }
 function ListRow({ t, I, onClick }: { t: string; I: typeof User; onClick?: () => void }) {
   return (
-    <button onClick={onClick} className="flex w-full items-center gap-3 rounded-2xl bg-card p-4 shadow-card">
+    <button onClick={onClick} className="flex w-full items-center gap-3 rounded-2xl bg-card p-4 shadow-card active:scale-[0.98] transition">
       <I className="h-5 w-5 text-primary" /><span className="flex-1 text-left text-sm font-medium">{t}</span><ChevronRight className="h-4 w-4 text-muted-foreground" />
     </button>
   );
@@ -485,11 +487,11 @@ function Drawer({ go, close }: { go: (s: Screen) => void; close: () => void }) {
     { t: "Logout", I: LogOut, s: "login" },
   ];
   return (
-    <div className="absolute inset-0 z-30 flex flex-col justify-end bg-foreground/50 animate-in fade-in" onClick={close}>
-      <div onClick={(e) => e.stopPropagation()} className="space-y-1 rounded-t-[2rem] bg-background p-5 animate-in slide-in-from-bottom">
+    <div className="absolute inset-0 z-30 flex flex-col justify-end bg-foreground/50 backdrop-blur-sm animate-in fade-in" onClick={close}>
+      <div onClick={(e) => e.stopPropagation()} className="space-y-1 rounded-t-[2rem] bg-background p-5 pb-[max(env(safe-area-inset-bottom),1.5rem)] animate-in slide-in-from-bottom">
         <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-muted" />
         {items.map(({ t, I, s }) => (
-          <button key={t} onClick={() => (s ? go(s) : close())} className="flex w-full items-center gap-3 rounded-xl p-3 hover:bg-muted">
+          <button key={t} onClick={() => (s ? go(s) : close())} className="flex w-full items-center gap-3 rounded-xl p-3 hover:bg-muted active:scale-[0.98] transition">
             <span className="grid h-9 w-9 place-items-center rounded-xl bg-accent text-primary"><I className="h-4 w-4" /></span>
             <span className="flex-1 text-left text-sm font-medium">{t}</span><ChevronRight className="h-4 w-4 text-muted-foreground" />
           </button>
@@ -550,11 +552,11 @@ function TabBar({ screen, go, count }: { screen: Screen; go: (s: Screen) => void
     { t: "Cart", I: ShoppingCart, s: "cart" }, { t: "Profile", I: User, s: "profile" },
   ];
   return (
-    <nav className="flex justify-around border-t bg-background px-3 py-2">
+    <nav className="flex justify-around border-t bg-background/95 px-3 pt-2 pb-[max(env(safe-area-inset-bottom),0.75rem)] backdrop-blur">
       {tabs.map(({ t, I, s }) => {
         const active = screen === s;
         return (
-          <button key={t} onClick={() => go(s)} className={`relative flex items-center gap-1.5 rounded-full px-4 py-2 text-xs font-semibold transition ${active ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}>
+          <button key={t} onClick={() => go(s)} className={`relative flex items-center gap-1.5 rounded-full px-4 py-2 text-xs font-semibold transition active:scale-95 ${active ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}>
             <I className="h-5 w-5" />{active && t}
             {s === "cart" && count > 0 && !active && <span className="absolute right-2 top-1 h-2 w-2 rounded-full bg-primary" />}
           </button>
