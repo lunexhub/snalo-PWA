@@ -245,8 +245,11 @@ async function processIncomingWhatsAppPayload(payload: {
     lower.includes("track order") ||
     lower === "tracking";
 
-  // Flow D: User replied with an order number (e.g. SN-8812, SN-TEST, or 4-digit code)
-  const orderRegex = /^(sn[-_]?[a-z0-9]+|\d{4,8})$/i;
+  // Flow D: User provided an order number (e.g. SN-LIVE-3397, SN-1024, #1024, 1024, or "where is order SN-1024")
+  const orderMatch =
+    userText.match(/\b(#?sn[-_a-z0-9]+|#\d{4,8})\b/i) ||
+    (userText.trim().match(/^\d{4,8}$/) ? [userText.trim()] : null);
+  const matchedOrderId = orderMatch ? orderMatch[0].replace(/^#/, "") : null;
 
   // Flow E: Help / Support (Button tapped or typed)
   const isHelp =
@@ -261,7 +264,7 @@ async function processIncomingWhatsAppPayload(payload: {
     !isPlaceOrder &&
     !isTrack &&
     !isHelp &&
-    !orderRegex.test(lower) &&
+    !matchedOrderId &&
     (buttonId === "btn_menu" ||
       /\b(hi|hello|hey|howzit|hola|molo|dumelang|start|menu)\b/i.test(lower) ||
       /^(good\s*(morning|afternoon|evening))$/i.test(lower));
@@ -321,8 +324,8 @@ Please reply with your *Order Number* (e.g., *SN-1024* or your order digits) and
     return;
   }
 
-  if (orderRegex.test(lower)) {
-    const order = await fetchOrderById(userText);
+  if (matchedOrderId) {
+    const order = await fetchOrderById(matchedOrderId);
     let replyMsg = "";
     if (order) {
       replyMsg = `📦 *Order #${order.id} Found!*
@@ -335,7 +338,7 @@ Please reply with your *Order Number* (e.g., *SN-1024* or your order digits) and
 Live GPS map tracking:
 👉 ${APP_URL}/?screen=tracking&order=${order.id}`;
     } else {
-      replyMsg = `We couldn't find order *#${userText.toUpperCase()}*.
+      replyMsg = `We couldn't find order *#${matchedOrderId.toUpperCase()}*.
 
 Please check your confirmation message or order digits, or tap below to open the store:
 👉 ${storeLink}`;
@@ -580,8 +583,11 @@ async function sendWhatsAppReplyButtons(
 
 async function fetchRecentOrderByPhone(phone: string) {
   try {
+    const cleanPhone = phone.replace(/\D/g, "");
+    const last9 = cleanPhone.slice(-9);
+    const filter = last9.length >= 7 ? `phone=ilike.%25${last9}` : `phone=eq.${phone}`;
     const res = await fetch(
-      `${SUPABASE_URL}/rest/v1/orders?phone=eq.${phone}&order=created_at.desc&limit=1`,
+      `${SUPABASE_URL}/rest/v1/orders?${filter}&order=created_at.desc&limit=1`,
       {
         headers: {
           apikey: SUPABASE_KEY,
@@ -599,7 +605,7 @@ async function fetchRecentOrderByPhone(phone: string) {
 
 async function fetchOrderById(orderId: string) {
   try {
-    const clean = orderId.toUpperCase().trim();
+    const clean = orderId.replace(/^#/, "").toUpperCase().trim();
     const res = await fetch(
       `${SUPABASE_URL}/rest/v1/orders?id=ilike.%25${encodeURIComponent(clean)}%25&order=created_at.desc&limit=1`,
       {
