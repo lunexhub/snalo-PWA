@@ -18,6 +18,40 @@ import grapesImg from "@/assets/foods/grapes.png";
 type Screen = "splash" | "welcome" | "login" | "home" | "products" | "cart" | "checkout" | "tracking" | "profile" | "notifications";
 type Product = { id: string; name: string; unit: string; price: number; img: string; cat: string };
 
+type WhatsAppContext = {
+  isWhatsApp: boolean;
+  phone: string;
+  name: string;
+  address: string;
+  botPhone: string;
+  ref: string;
+  initialScreen?: Screen;
+  initialCart?: Record<string, number>;
+};
+
+type OrderItem = {
+  id: string;
+  name: string;
+  unit: string;
+  price: number;
+  quantity: number;
+};
+
+type OrderData = {
+  orderId: string;
+  items: OrderItem[];
+  subtotal: number;
+  deliveryFee: number;
+  serviceFee: number;
+  total: number;
+  paymentMethod: string;
+  customerName: string;
+  customerPhone: string;
+  address: string;
+  ref: string;
+  createdAt: string;
+};
+
 const PRODUCTS: Product[] = [
   { id: "apple", name: "Fresh Apples", unit: "1 Kg", price: 25, img: appleImg, cat: "Fruits" },
   { id: "banana", name: "Bananas", unit: "1 Kg", price: 18, img: bananaImg, cat: "Fruits" },
@@ -31,9 +65,148 @@ const PRODUCTS: Product[] = [
 const CATS = [{ n: "Groceries", e: "🛒" }, { n: "Fruits", e: "🍓" }, { n: "Vegetables", e: "🥦" }, { n: "Dairy", e: "🥛" }];
 const SHOPS = ["Pick n Pay", "Shoprite", "Checkers", "Spar"];
 
+function getWhatsAppContext(): WhatsAppContext {
+  if (typeof window === "undefined") {
+    return {
+      isWhatsApp: false,
+      phone: "",
+      name: "John Smith",
+      address: "12 Main Street, Johannesburg, SA",
+      botPhone: "27821234567",
+      ref: "",
+    };
+  }
+
+  const params = new URLSearchParams(window.location.search);
+  const ua = navigator.userAgent || "";
+  const referrer = document.referrer || "";
+  const isWaUa = /WhatsApp/i.test(ua);
+  const isWaReferrer = /whatsapp/i.test(referrer);
+  const hasWaParam =
+    params.get("source") === "whatsapp" ||
+    params.get("mode") === "whatsapp" ||
+    params.get("wa") === "1" ||
+    params.get("wa") === "true" ||
+    params.has("wa_id") ||
+    params.has("phone") ||
+    params.has("bot");
+
+  const isWhatsApp = isWaUa || isWaReferrer || hasWaParam;
+  const phone = params.get("phone") || params.get("wa_id") || "";
+  const rawName = params.get("name");
+  const name = rawName || (phone ? `WhatsApp User (${phone.slice(-4)})` : "John Smith");
+  const address = params.get("address") || "12 Main Street, Johannesburg, SA";
+  const botPhone = (params.get("bot") || params.get("business_phone") || "27821234567").replace(/[^0-9]/g, "");
+  const ref = params.get("ref") || params.get("session_id") || "";
+
+  const targetScreen = params.get("screen") as Screen | null;
+  const initialScreen = targetScreen && ["home", "products", "cart", "checkout", "tracking", "profile"].includes(targetScreen)
+    ? targetScreen
+    : undefined;
+
+  let initialCart: Record<string, number> | undefined;
+  const itemsParam = params.get("items");
+  if (itemsParam) {
+    initialCart = {};
+    const pairs = itemsParam.split(",");
+    for (const pair of pairs) {
+      const [id, qtyStr] = pair.split(":");
+      const qty = parseInt(qtyStr, 10);
+      if (id && !isNaN(qty) && qty > 0) {
+        initialCart[id.trim()] = qty;
+      }
+    }
+  }
+
+  return {
+    isWhatsApp,
+    phone,
+    name,
+    address,
+    botPhone: botPhone || "27821234567",
+    ref,
+    initialScreen,
+    initialCart,
+  };
+}
+
+function buildWhatsAppOrderMessage(order: OrderData | null, wa: WhatsAppContext): string {
+  const id = order?.orderId || "SN1024";
+  const customerName = order?.customerName || wa.name || "Customer";
+  const phone = order?.customerPhone || wa.phone;
+  const address = order?.address || wa.address;
+  const total = order?.total ?? 85;
+  const payment =
+    order?.paymentMethod === "cod"
+      ? "Cash On Delivery"
+      : order?.paymentMethod === "wa"
+      ? "Confirm & Pay via WhatsApp"
+      : "Card";
+
+  const lines = [
+    `🛒 *New Snalo Order #${id}*`,
+    `━━━━━━━━━━━━━━━━━━`,
+    `👤 *Customer:* ${customerName}${phone ? ` (${phone})` : ""}`,
+    `📍 *Delivery Address:* ${address}`,
+    ``,
+    `*Items Ordered:*`,
+  ];
+
+  if (order?.items && order.items.length > 0) {
+    order.items.forEach((item) => {
+      lines.push(`• ${item.name} (${item.unit}) x${item.quantity} — R ${item.price * item.quantity}`);
+    });
+  } else {
+    lines.push(`• Fresh Grocery Order`);
+  }
+
+  lines.push(``);
+  lines.push(`💵 *Total Amount:* R ${total}`);
+  lines.push(`💳 *Payment Method:* ${payment}`);
+  if (wa.ref) {
+    lines.push(`🔖 *Bot Ref:* ${wa.ref}`);
+  }
+  lines.push(`⏱ *Delivery Time:* 15–20 Mins`);
+  lines.push(`━━━━━━━━━━━━━━━━━━`);
+  lines.push(`Please confirm my order and start delivery! 🚀`);
+
+  return lines.join("\n");
+}
+
+function openWhatsAppMessage(phone: string, text: string) {
+  const cleanPhone = phone.replace(/[^0-9]/g, "");
+  const encoded = encodeURIComponent(text);
+  const waUrl = `https://wa.me/${cleanPhone}?text=${encoded}`;
+  if (typeof window !== "undefined") {
+    const win = window.open(waUrl, "_blank");
+    if (!win) {
+      window.location.href = waUrl;
+    }
+  }
+}
+
 export default function SnaloApp() {
-  const [screen, setScreen] = useState<Screen>("splash");
-  const [cart, setCart] = useState<Record<string, number>>({ apple: 1, banana: 2, potato: 1 });
+  const [waContext] = useState<WhatsAppContext>(() => getWhatsAppContext());
+  const [screen, setScreen] = useState<Screen>(() => {
+    const ctx = getWhatsAppContext();
+    if (ctx.isWhatsApp) {
+      return ctx.initialScreen || "home";
+    }
+    return "splash";
+  });
+  const [cart, setCart] = useState<Record<string, number>>(() => {
+    const ctx = getWhatsAppContext();
+    if (ctx.initialCart && Object.keys(ctx.initialCart).length > 0) {
+      return ctx.initialCart;
+    }
+    return { apple: 1, banana: 2, potato: 1 };
+  });
+  const [customer, setCustomer] = useState(() => ({
+    name: waContext.name,
+    phone: waContext.phone,
+    address: waContext.address,
+  }));
+  const [lastOrder, setLastOrder] = useState<OrderData | null>(null);
   const [drawer, setDrawer] = useState(false);
   const go = (s: Screen) => { setDrawer(false); setScreen(s); };
   const add = (id: string, d = 1) =>
@@ -41,20 +214,48 @@ export default function SnaloApp() {
   const count = Object.values(cart).reduce((a, b) => a + b, 0);
   const subtotal = Object.entries(cart).reduce((s, [id, q]) => s + (PRODUCTS.find((p) => p.id === id)!.price * q), 0);
 
-  useEffect(() => { if (screen !== "splash") return; const t = setTimeout(() => setScreen("welcome"), 1800); return () => clearTimeout(t); }, [screen]);
+  useEffect(() => {
+    if (waContext.isWhatsApp) return;
+    if (screen !== "splash") return;
+    const t = setTimeout(() => setScreen("welcome"), 1800);
+    return () => clearTimeout(t);
+  }, [screen, waContext.isWhatsApp]);
+
+  // Handle postMessage communication from host chatbot webview
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const handleMessage = (e: MessageEvent) => {
+      if (!e.data || typeof e.data !== "object") return;
+      if (e.data.type === "SNALO_SET_USER") {
+        setCustomer((prev) => ({
+          name: e.data.name || prev.name,
+          phone: e.data.phone || prev.phone,
+          address: e.data.address || prev.address,
+        }));
+      }
+      if (e.data.type === "SNALO_NAVIGATE" && e.data.screen) {
+        go(e.data.screen);
+      }
+      if (e.data.type === "SNALO_ADD_TO_CART" && e.data.id) {
+        add(e.data.id, e.data.quantity || 1);
+      }
+    };
+    window.addEventListener("message", handleMessage);
+    return () => window.removeEventListener("message", handleMessage);
+  }, []);
 
   const tabbed = ["home", "profile"].includes(screen);
   let body: ReactNode;
   switch (screen) {
     case "splash": body = <Splash />; break;
-    case "welcome": body = <Welcome go={go} />; break;
-    case "login": body = <Login go={go} />; break;
-    case "home": body = <HomeScreen go={go} add={add} cart={cart} count={count} openDrawer={() => setDrawer(true)} />; break;
+    case "welcome": body = <Welcome go={go} isWhatsApp={waContext.isWhatsApp} />; break;
+    case "login": body = <Login go={go} isWhatsApp={waContext.isWhatsApp} />; break;
+    case "home": body = <HomeScreen go={go} add={add} cart={cart} count={count} openDrawer={() => setDrawer(true)} waContext={waContext} customer={customer} />; break;
     case "products": body = <Products go={go} add={add} cart={cart} count={count} />; break;
     case "cart": body = <Cart go={go} add={add} cart={cart} subtotal={subtotal} />; break;
-    case "checkout": body = <Checkout go={go} subtotal={subtotal} clear={() => setCart({})} />; break;
-    case "tracking": body = <Tracking go={go} />; break;
-    case "profile": body = <Profile go={go} />; break;
+    case "checkout": body = <Checkout go={go} subtotal={subtotal} cart={cart} clear={() => setCart({})} waContext={waContext} customer={customer} setCustomer={setCustomer} setLastOrder={setLastOrder} />; break;
+    case "tracking": body = <Tracking go={go} waContext={waContext} lastOrder={lastOrder} />; break;
+    case "profile": body = <Profile go={go} customer={customer} waContext={waContext} />; break;
     case "notifications": body = <Notifications go={go} />; break;
   }
 
@@ -63,7 +264,7 @@ export default function SnaloApp() {
       <div className="relative flex h-full w-full max-w-md flex-col overflow-hidden bg-background sm:h-[844px] sm:max-h-[92vh] sm:rounded-[2.5rem] sm:border-[8px] sm:border-foreground/90 sm:shadow-phone">
         <div className="min-h-0 flex-1 overflow-y-auto no-scrollbar overscroll-contain">{body}</div>
         {tabbed && <TabBar screen={screen} go={go} count={count} />}
-        {drawer && <Drawer go={go} close={() => setDrawer(false)} />}
+        {drawer && <Drawer go={go} close={() => setDrawer(false)} waContext={waContext} />}
       </div>
     </div>
   );
@@ -180,9 +381,9 @@ function usePwaInstall() {
   return { install, installed, showIosSheet, closeIosSheet: () => setShowIosSheet(false) };
 }
 
-function InstallButton() {
+function InstallButton({ isWhatsApp = false }: { isWhatsApp?: boolean }) {
   const { install, installed, showIosSheet, closeIosSheet } = usePwaInstall();
-  if (installed) return null;
+  if (installed || isWhatsApp) return null;
 
   return (
     <>
@@ -292,11 +493,11 @@ function Splash() {
   );
 }
 
-function Welcome({ go }: { go: (s: Screen) => void }) {
+function Welcome({ go, isWhatsApp }: { go: (s: Screen) => void; isWhatsApp?: boolean }) {
   return (
     <div className="relative flex h-full flex-col bg-primary text-primary-foreground overflow-hidden">
       <div className="absolute -right-16 top-24 h-56 w-56 rounded-full bg-warning/60 pointer-events-none" />
-      <InstallButton />
+      <InstallButton isWhatsApp={isWhatsApp} />
       <div className="relative px-6 pt-[max(env(safe-area-inset-top),2.5rem)] text-center">
         <h1 className="text-5xl sm:text-6xl font-extrabold tracking-tight">Snalo</h1>
         <p className="mt-1 text-xs sm:text-sm font-semibold tracking-[0.3em]">FAST DELIVERY</p>
@@ -314,13 +515,13 @@ function Welcome({ go }: { go: (s: Screen) => void }) {
   );
 }
 
-function Login({ go }: { go: (s: Screen) => void }) {
+function Login({ go, isWhatsApp }: { go: (s: Screen) => void; isWhatsApp?: boolean }) {
   const [show, setShow] = useState(false);
   const [email, setEmail] = useState("johnsmith@gmail.com");
   const [pw, setPw] = useState("password");
   return (
     <div className="flex h-full flex-col px-6 pt-[max(env(safe-area-inset-top),2rem)] pb-[max(env(safe-area-inset-bottom),1.5rem)] overflow-y-auto no-scrollbar">
-      <InstallButton />
+      <InstallButton isWhatsApp={isWhatsApp} />
       <div className="mx-auto mt-4 grid h-16 w-16 place-items-center rounded-2xl bg-accent text-primary shadow-sm"><Bike className="h-8 w-8" /></div>
       <h1 className="mt-5 text-center text-2xl font-bold">Welcome Back</h1>
       <p className="mt-1 text-center text-sm text-muted-foreground">Login to continue your delivery journey</p>
@@ -344,14 +545,36 @@ function Login({ go }: { go: (s: Screen) => void }) {
 
 type ShopProps = { go: (s: Screen) => void; add: (id: string) => void; cart: Record<string, number>; count: number };
 
-function HomeScreen({ go, add, count, openDrawer }: ShopProps & { openDrawer: () => void }) {
+function HomeScreen({
+  go,
+  add,
+  count,
+  openDrawer,
+  waContext,
+  customer,
+}: ShopProps & {
+  openDrawer: () => void;
+  waContext: WhatsAppContext;
+  customer: { name: string; phone: string; address: string };
+}) {
   return (
     <div className="px-5 pb-6 pt-[max(env(safe-area-inset-top),1.25rem)]">
+      {waContext.isWhatsApp && (
+        <div className="mb-3 flex items-center justify-between rounded-2xl bg-emerald-500/15 border border-emerald-500/25 px-3.5 py-2 text-xs text-emerald-800 dark:text-emerald-300">
+          <div className="flex items-center gap-2 font-semibold">
+            <WhatsAppIcon className="h-4 w-4 text-emerald-600 fill-current" />
+            <span>WhatsApp Order Mode</span>
+          </div>
+          <span className="font-semibold text-[11px] opacity-90 truncate max-w-[150px]">
+            {customer.name || (customer.phone ? `+${customer.phone}` : "Chatbot Connected")}
+          </span>
+        </div>
+      )}
       <div className="flex items-center gap-3">
         <button onClick={openDrawer} aria-label="Menu" className="rounded-full p-2 hover:bg-muted active:scale-90 transition"><Menu className="h-6 w-6" /></button>
         <div className="flex-1 min-w-0">
           <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Deliver to</p>
-          <p className="flex items-center gap-1 font-bold text-sm truncate"><MapPin className="h-4 w-4 text-primary shrink-0" />Johannesburg, SA</p>
+          <p className="flex items-center gap-1 font-bold text-sm truncate"><MapPin className="h-4 w-4 text-primary shrink-0" />{customer.address}</p>
         </div>
         <button onClick={() => go("notifications")} aria-label="Notifications" className="relative rounded-full p-2 hover:bg-muted active:scale-90 transition">
           <Bell className="h-5 w-5" /><span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-primary" />
@@ -365,7 +588,7 @@ function HomeScreen({ go, add, count, openDrawer }: ShopProps & { openDrawer: ()
         <p className="mt-1 text-xs opacity-90">Groceries, Foods & More</p>
         <div className="mt-3 flex items-center gap-2">
           <button onClick={() => go("products")} className="rounded-full bg-background px-4 py-1.5 text-xs font-semibold text-primary active:scale-95 transition">Order Now →</button>
-          <a href="https://wa.me/27821234567?text=Hi%2C%20I%27d%20like%20to%20order%20groceries" target="_blank" rel="noopener noreferrer" aria-label="Order on WhatsApp" className="grid h-8 w-8 place-items-center rounded-full bg-success text-primary-foreground shadow-card transition active:scale-90"><WhatsAppIcon className="h-4 w-4" /></a>
+          <a href={`https://wa.me/${waContext.botPhone}?text=Hi%2C%20I%27d%20like%20to%20order%20groceries`} target="_blank" rel="noopener noreferrer" aria-label="Order on WhatsApp" className="grid h-8 w-8 place-items-center rounded-full bg-success text-primary-foreground shadow-card transition active:scale-90"><WhatsAppIcon className="h-4 w-4" /></a>
         </div>
         <img src={basket} alt="" width={1024} height={1024} className="absolute -bottom-3 -right-4 w-36 sm:w-40 pointer-events-none" />
       </div>
@@ -485,58 +708,258 @@ function Row({ l, r }: { l: string; r: string }) {
   return <div className="flex justify-between py-1 text-sm"><span className="text-muted-foreground">{l}</span><span className="font-medium">{r}</span></div>;
 }
 
-function Checkout({ go, subtotal, clear }: { go: (s: Screen) => void; subtotal: number; clear: () => void }) {
-  const [pay, setPay] = useState("card");
+function Checkout({
+  go,
+  subtotal,
+  cart,
+  clear,
+  waContext,
+  customer,
+  setCustomer,
+  setLastOrder,
+}: {
+  go: (s: Screen) => void;
+  subtotal: number;
+  cart: Record<string, number>;
+  clear: () => void;
+  waContext: WhatsAppContext;
+  customer: { name: string; phone: string; address: string };
+  setCustomer: React.Dispatch<React.SetStateAction<{ name: string; phone: string; address: string }>>;
+  setLastOrder: (o: OrderData) => void;
+}) {
+  const [pay, setPay] = useState(waContext.isWhatsApp ? "wa" : "card");
   const [promo, setPromo] = useState(false);
+  const [editingAddress, setEditingAddress] = useState(false);
+  const [tempAddress, setTempAddress] = useState(customer.address);
   const fee = promo || subtotal >= 150 ? 0 : 15;
+
   const methods = [
-    { id: "card", t: "Credit / Debit Card", s: "Pay securely using your card", I: CreditCard },
+    { id: "wa", t: "Confirm & Pay via WhatsApp", s: "Send full order directly to WhatsApp bot", I: WhatsAppIcon },
     { id: "cod", t: "Cash On Delivery", s: "Pay in cash when your order arrives", I: Banknote },
+    { id: "card", t: "Credit / Debit Card", s: "Pay securely using your card", I: CreditCard },
     { id: "wallet", t: "Wallet", s: "Pay using your wallet balance", I: Wallet },
   ];
+
+  const handlePlaceOrder = (sendToWhatsApp = false) => {
+    const orderId = `SN-WA${Math.floor(1000 + Math.random() * 9000)}`;
+    const itemsList: OrderItem[] = Object.entries(cart).map(([id, q]) => {
+      const p = PRODUCTS.find((x) => x.id === id);
+      return {
+        id,
+        name: p?.name || id,
+        unit: p?.unit || "",
+        price: p?.price || 0,
+        quantity: q,
+      };
+    });
+
+    const total = subtotal + fee + 5;
+    const orderData: OrderData = {
+      orderId,
+      items: itemsList,
+      subtotal,
+      deliveryFee: fee,
+      serviceFee: 5,
+      total,
+      paymentMethod: pay,
+      customerName: customer.name,
+      customerPhone: customer.phone,
+      address: customer.address,
+      ref: waContext.ref,
+      createdAt: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+    };
+
+    setLastOrder(orderData);
+
+    // 1. Dispatch postMessage for WebView container / iframe integrations
+    if (typeof window !== "undefined") {
+      try {
+        window.parent.postMessage(
+          {
+            type: "SNALO_ORDER_PLACED",
+            source: "snalo-webview",
+            order: orderData,
+          },
+          "*"
+        );
+      } catch (e) {}
+    }
+
+    // 2. Open WhatsApp if requested or if WhatsApp pay selected
+    if (sendToWhatsApp || pay === "wa") {
+      const msg = buildWhatsAppOrderMessage(orderData, waContext);
+      openWhatsAppMessage(waContext.botPhone, msg);
+    }
+
+    clear();
+    go("tracking");
+  };
+
   return (
     <div className="pb-6">
       <Header title="Checkout" sub="Snalo Fast Delivery" back={() => go("cart")} />
       <div className="px-5">
+        {waContext.isWhatsApp && (
+          <div className="mb-4 flex items-center justify-between rounded-2xl bg-emerald-500/15 border border-emerald-500/25 p-3 text-xs text-emerald-800 dark:text-emerald-300">
+            <div className="flex items-center gap-2 font-semibold">
+              <WhatsAppIcon className="h-4 w-4 text-emerald-600 fill-current" />
+              <span>Ordering via WhatsApp Chatbot</span>
+            </div>
+            <span className="font-semibold text-[11px] opacity-80 truncate max-w-[140px]">{customer.name}</span>
+          </div>
+        )}
+
         <h3 className="mb-2 font-bold">Delivery Address</h3>
-        <div className="flex items-center gap-3 rounded-2xl bg-card p-4 shadow-card">
-          <div className="grid h-10 w-10 place-items-center rounded-xl bg-accent text-primary"><MapPin className="h-5 w-5" /></div>
-          <div className="flex-1"><p className="font-semibold">Home Address</p><p className="text-xs text-muted-foreground">12 Main Street, Johannesburg, SA</p></div>
-          <ChevronRight className="h-4 w-4 text-muted-foreground" />
+        <div className="rounded-2xl bg-card p-4 shadow-card">
+          <div className="flex items-start gap-3">
+            <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-accent text-primary">
+              <MapPin className="h-5 w-5" />
+            </div>
+            {editingAddress ? (
+              <div className="flex-1 space-y-2">
+                <input
+                  type="text"
+                  value={tempAddress}
+                  onChange={(e) => setTempAddress(e.target.value)}
+                  placeholder="Enter your street address"
+                  className="w-full rounded-xl bg-muted px-3 py-2 text-xs outline-none focus:ring-1 focus:ring-primary"
+                />
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCustomer((prev) => ({ ...prev, address: tempAddress }));
+                      setEditingAddress(false);
+                    }}
+                    className="rounded-lg bg-primary px-3 py-1 text-xs font-semibold text-primary-foreground"
+                  >
+                    Save
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEditingAddress(false)}
+                    className="rounded-lg bg-muted px-3 py-1 text-xs font-medium text-foreground"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex-1 min-w-0" onClick={() => setEditingAddress(true)}>
+                <p className="font-semibold text-sm">Delivery Location</p>
+                <p className="text-xs text-muted-foreground break-words">{customer.address}</p>
+              </div>
+            )}
+            {!editingAddress && (
+              <button
+                onClick={() => setEditingAddress(true)}
+                className="text-xs font-semibold text-primary shrink-0"
+              >
+                Change
+              </button>
+            )}
+          </div>
         </div>
+
         <h3 className="mb-2 mt-5 font-bold">Payment Method</h3>
         <div className="space-y-2">
           {methods.map(({ id, t, s, I }) => (
-            <button key={id} onClick={() => setPay(id)} className={`flex w-full items-center gap-3 rounded-2xl border-2 bg-card p-3.5 text-left transition ${pay === id ? "border-primary" : "border-transparent shadow-card"}`}>
-              <div className="grid h-10 w-10 place-items-center rounded-xl bg-accent text-primary"><I className="h-5 w-5" /></div>
-              <div className="flex-1"><p className="text-sm font-semibold">{t}</p><p className="text-xs text-muted-foreground">{s}</p></div>
-              <span className={`grid h-5 w-5 place-items-center rounded-full border-2 ${pay === id ? "border-primary bg-primary text-primary-foreground" : "border-muted-foreground/40"}`}>{pay === id && <Check className="h-3 w-3" />}</span>
+            <button
+              key={id}
+              onClick={() => setPay(id)}
+              className={`flex w-full items-center gap-3 rounded-2xl border-2 bg-card p-3.5 text-left transition ${
+                pay === id ? "border-primary" : "border-transparent shadow-card"
+              }`}
+            >
+              <div className="grid h-10 w-10 place-items-center rounded-xl bg-accent text-primary">
+                <I className="h-5 w-5" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold truncate">{t}</p>
+                <p className="text-xs text-muted-foreground truncate">{s}</p>
+              </div>
+              <span
+                className={`grid h-5 w-5 place-items-center rounded-full border-2 ${
+                  pay === id
+                    ? "border-primary bg-primary text-primary-foreground"
+                    : "border-muted-foreground/40"
+                }`}
+              >
+                {pay === id && <Check className="h-3 w-3" />}
+              </span>
             </button>
           ))}
         </div>
+
         <div className="mt-3 flex items-center gap-2 rounded-2xl bg-warning/15 p-3 text-sm">
-          <Tag className="h-4 w-4 text-warning" /><span className="flex-1">Free delivery on orders above R150</span>
-          <button onClick={() => setPromo(true)} className="font-semibold text-primary">{promo ? "Applied" : "Apply"}</button>
+          <Tag className="h-4 w-4 text-warning" />
+          <span className="flex-1">Free delivery on orders above R150</span>
+          <button onClick={() => setPromo(true)} className="font-semibold text-primary">
+            {promo ? "Applied" : "Apply"}
+          </button>
         </div>
+
         <h3 className="mb-2 mt-5 font-bold">Order Summary</h3>
         <div className="rounded-2xl bg-card p-4 shadow-card">
-          <Row l="Subtotal" r={`R ${subtotal}`} /><Row l="Delivery Fee" r={`R ${fee}`} /><Row l="Service Fee" r="R 5" />
+          <Row l="Subtotal" r={`R ${subtotal}`} />
+          <Row l="Delivery Fee" r={`R ${fee}`} />
+          <Row l="Service Fee" r="R 5" />
           <div className="my-2 border-t" />
-          <div className="flex justify-between font-bold"><span>Total</span><span className="text-primary">R {subtotal + fee + 5}</span></div>
+          <div className="flex justify-between font-bold">
+            <span>Total</span>
+            <span className="text-primary">R {subtotal + fee + 5}</span>
+          </div>
         </div>
-        <div className="mt-5"><PrimaryBtn onClick={() => { clear(); go("tracking"); }}>Place Order <ChevronRight className="h-5 w-5" /></PrimaryBtn></div>
+
+        <div className="mt-5 space-y-2">
+          {waContext.isWhatsApp || pay === "wa" ? (
+            <button
+              onClick={() => handlePlaceOrder(true)}
+              className="flex w-full items-center justify-center gap-2 rounded-2xl bg-[#25D366] hover:bg-[#20ba5a] py-4 font-bold text-white shadow-card transition active:scale-[0.98]"
+            >
+              <WhatsAppIcon className="h-5 w-5 fill-current" />
+              Send Order to WhatsApp Bot
+            </button>
+          ) : (
+            <PrimaryBtn onClick={() => handlePlaceOrder(false)}>
+              Place Order <ChevronRight className="h-5 w-5" />
+            </PrimaryBtn>
+          )}
+
+          {waContext.isWhatsApp && (
+            <button
+              onClick={() => handlePlaceOrder(false)}
+              className="w-full rounded-2xl border border-input bg-card py-3 text-xs font-semibold text-foreground hover:bg-muted active:scale-[0.98] transition"
+            >
+              Place Order & Track In-App Only
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );
 }
 
-function Tracking({ go }: { go: (s: Screen) => void }) {
+function Tracking({
+  go,
+  waContext,
+  lastOrder,
+}: {
+  go: (s: Screen) => void;
+  waContext: WhatsAppContext;
+  lastOrder: OrderData | null;
+}) {
   const [step, setStep] = useState(2);
-  useEffect(() => { const t = setTimeout(() => setStep(3), 8000); return () => clearTimeout(t); }, []);
+  useEffect(() => {
+    const t = setTimeout(() => setStep(3), 8000);
+    return () => clearTimeout(t);
+  }, []);
   const steps = [["Placed", "10:10 AM"], ["Preparing", "10:20 AM"], ["On Way", "10:30 AM"], ["Delivered", ""]];
+  const orderId = lastOrder?.orderId || "SN1024";
+
   return (
     <div className="relative h-full flex flex-col overflow-hidden">
-      <div className="relative flex-1 min-h-[280px] w-full bg-muted overflow-hidden">
+      <div className="relative flex-1 min-h-[260px] w-full bg-muted overflow-hidden">
         <svg viewBox="0 0 390 500" className="absolute inset-0 h-full w-full bg-muted" preserveAspectRatio="xMidYMid slice">
           {[60, 140, 230, 320].map((x) => <rect key={x} x={x} y="0" width="14" height="500" className="fill-background" />)}
           {[80, 190, 300, 410].map((y) => <rect key={y} x="0" y={y} width="390" height="14" className="fill-background" />)}
@@ -552,7 +975,10 @@ function Tracking({ go }: { go: (s: Screen) => void }) {
 
       <div className="rounded-t-[2rem] bg-background p-5 pb-[max(env(safe-area-inset-bottom),1.5rem)] shadow-phone shrink-0">
         <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-muted" />
-        <span className="rounded-full bg-success/15 px-3 py-1 text-[10px] font-bold text-success">● LIVE TRACKING</span>
+        <div className="flex items-center justify-between">
+          <span className="rounded-full bg-success/15 px-3 py-1 text-[10px] font-bold text-success">● LIVE TRACKING</span>
+          <span className="font-mono text-xs font-semibold text-muted-foreground">Order #{orderId}</span>
+        </div>
         <div className="mt-3 flex items-center gap-3">
           <div className="grid h-12 w-12 place-items-center rounded-xl bg-accent text-primary shrink-0"><Bike className="h-6 w-6" /></div>
           <div><p className="font-bold">{step === 3 ? "Order Delivered!" : "Order On The Way"}</p><p className="text-xs text-muted-foreground">{step === 3 ? "Enjoy your groceries" : <>Arriving in <span className="font-semibold text-primary">15 mins</span></>}</p></div>
@@ -561,7 +987,7 @@ function Tracking({ go }: { go: (s: Screen) => void }) {
           <div className="grid h-10 w-10 place-items-center rounded-full bg-primary text-primary-foreground shrink-0"><User className="h-5 w-5" /></div>
           <div className="flex-1 min-w-0"><p className="text-sm font-semibold truncate">John Rider</p><p className="text-xs text-muted-foreground">Delivery Partner</p></div>
           <a href="tel:+27821234567" aria-label="Call rider" className="grid h-9 w-9 place-items-center rounded-full bg-primary text-primary-foreground active:scale-90 transition"><Phone className="h-4 w-4" /></a>
-          <a href="https://wa.me/27821234567?text=Hi%2C%20I%27m%20asking%20about%20my%20Snalo%20order" target="_blank" rel="noopener noreferrer" aria-label="Chat on WhatsApp" className="grid h-9 w-9 place-items-center rounded-full bg-success text-primary-foreground active:scale-90 transition"><WhatsAppIcon className="h-4 w-4" /></a>
+          <a href={`https://wa.me/27821234567?text=Hi%2C%20I%27m%20asking%20about%20my%20Snalo%20order%20%23${orderId}`} target="_blank" rel="noopener noreferrer" aria-label="Chat on WhatsApp" className="grid h-9 w-9 place-items-center rounded-full bg-success text-primary-foreground active:scale-90 transition"><WhatsAppIcon className="h-4 w-4" /></a>
         </div>
         <div className="mt-5 flex justify-between">
           {steps.map(([l, t], i) => (
@@ -574,22 +1000,67 @@ function Tracking({ go }: { go: (s: Screen) => void }) {
             </div>
           ))}
         </div>
+
+        <div className="mt-5 space-y-2">
+          <a
+            href={`https://wa.me/${waContext.botPhone}?text=${encodeURIComponent(
+              `Hi! I am tracking my Snalo order #${orderId}`
+            )}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex w-full items-center justify-center gap-2 rounded-2xl bg-[#25D366] hover:bg-[#20ba5a] py-3.5 text-sm font-bold text-white shadow-card transition active:scale-[0.98]"
+          >
+            <WhatsAppIcon className="h-5 w-5 fill-current" />
+            Chat with WhatsApp Bot
+          </a>
+          <button
+            onClick={() => {
+              if (typeof window !== "undefined") {
+                try {
+                  window.close();
+                } catch (e) {}
+              }
+              go("home");
+            }}
+            className="w-full py-2 text-center text-xs font-semibold text-muted-foreground hover:text-foreground active:scale-95 transition"
+          >
+            {waContext.isWhatsApp ? "Back to Store (or Close WebView)" : "Return to Store"}
+          </button>
+        </div>
       </div>
     </div>
   );
 }
 
-function Profile({ go }: { go: (s: Screen) => void }) {
+function Profile({
+  go,
+  customer,
+  waContext,
+}: {
+  go: (s: Screen) => void;
+  customer: { name: string; phone: string; address: string };
+  waContext: WhatsAppContext;
+}) {
   const items = [
-    { t: "Saved Addresses", I: MapPin }, { t: "Payment Methods", I: CreditCard },
-    { t: "Help & Support", I: HelpCircle }, { t: "Settings", I: Settings },
+    { t: "Saved Addresses", I: MapPin },
+    { t: "Payment Methods", I: CreditCard },
+    { t: "Help & Support", I: HelpCircle },
+    { t: "Settings", I: Settings },
   ];
   return (
     <div className="px-5 pb-6 pt-[max(env(safe-area-inset-top),2rem)]">
       <h1 className="text-center text-lg font-bold">Profile</h1>
       <div className="mx-auto mt-6 grid h-24 w-24 place-items-center rounded-full bg-primary text-primary-foreground ring-8 ring-accent"><User className="h-12 w-12" /></div>
-      <p className="mt-4 text-center text-xl font-bold">John Smith</p>
-      <p className="text-center text-sm text-muted-foreground">johnsmith@gmail.com</p>
+      <p className="mt-4 text-center text-xl font-bold">{customer.name}</p>
+      <p className="text-center text-sm text-muted-foreground">
+        {customer.phone ? `WhatsApp: +${customer.phone}` : "johnsmith@gmail.com"}
+      </p>
+      {waContext.isWhatsApp && (
+        <div className="mx-auto mt-2.5 flex items-center justify-center gap-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 px-3 py-1 text-xs font-semibold text-emerald-700 dark:text-emerald-400">
+          <WhatsAppIcon className="h-3.5 w-3.5 fill-current" />
+          <span>Connected via WhatsApp Chatbot</span>
+        </div>
+      )}
       <div className="mt-6 space-y-2">
         {items.map(({ t, I }) => <ListRow key={t} t={t} I={I} />)}
         <ListRow t="Logout" I={LogOut} onClick={() => go("login")} />
@@ -597,6 +1068,7 @@ function Profile({ go }: { go: (s: Screen) => void }) {
     </div>
   );
 }
+
 function ListRow({ t, I, onClick }: { t: string; I: typeof User; onClick?: () => void }) {
   return (
     <button onClick={onClick} className="flex w-full items-center gap-3 rounded-2xl bg-card p-4 shadow-card active:scale-[0.98] transition">
@@ -605,18 +1077,47 @@ function ListRow({ t, I, onClick }: { t: string; I: typeof User; onClick?: () =>
   );
 }
 
-function Drawer({ go, close }: { go: (s: Screen) => void; close: () => void }) {
-  const items: { t: string; I: typeof User; s?: Screen }[] = [
-    { t: "My Profile", I: User, s: "profile" }, { t: "My Orders", I: Package, s: "tracking" },
-    { t: "Saved Addresses", I: MapPin }, { t: "Favorites", I: Heart }, { t: "Settings", I: Settings },
+function Drawer({
+  go,
+  close,
+  waContext,
+}: {
+  go: (s: Screen) => void;
+  close: () => void;
+  waContext: WhatsAppContext;
+}) {
+  const items: { t: string; I: typeof User; s?: Screen; action?: () => void }[] = [
+    { t: "My Profile", I: User, s: "profile" },
+    { t: "My Orders", I: Package, s: "tracking" },
+    { t: "Saved Addresses", I: MapPin },
+    { t: "Favorites", I: Heart },
+    {
+      t: "Chat on WhatsApp",
+      I: WhatsAppIcon,
+      action: () => openWhatsAppMessage(waContext.botPhone, "Hi Snalo! I want to chat about delivery."),
+    },
+    { t: "Settings", I: Settings },
     { t: "Logout", I: LogOut, s: "login" },
   ];
   return (
     <div className="absolute inset-0 z-30 flex flex-col justify-end bg-foreground/50 backdrop-blur-sm animate-in fade-in" onClick={close}>
       <div onClick={(e) => e.stopPropagation()} className="space-y-1 rounded-t-[2rem] bg-background p-5 pb-[max(env(safe-area-inset-bottom),1.5rem)] animate-in slide-in-from-bottom">
         <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-muted" />
-        {items.map(({ t, I, s }) => (
-          <button key={t} onClick={() => (s ? go(s) : close())} className="flex w-full items-center gap-3 rounded-xl p-3 hover:bg-muted active:scale-[0.98] transition">
+        {items.map(({ t, I, s, action }) => (
+          <button
+            key={t}
+            onClick={() => {
+              if (action) {
+                action();
+                close();
+              } else if (s) {
+                go(s);
+              } else {
+                close();
+              }
+            }}
+            className="flex w-full items-center gap-3 rounded-xl p-3 hover:bg-muted active:scale-[0.98] transition"
+          >
             <span className="grid h-9 w-9 place-items-center rounded-xl bg-accent text-primary"><I className="h-4 w-4" /></span>
             <span className="flex-1 text-left text-sm font-medium">{t}</span><ChevronRight className="h-4 w-4 text-muted-foreground" />
           </button>
