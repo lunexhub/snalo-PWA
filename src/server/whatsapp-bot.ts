@@ -49,10 +49,8 @@ export async function handleApiRequest(request: Request): Promise<Response> {
   if ((path === "/api/webhook" || path === "/api/whatsapp") && request.method === "POST") {
     try {
       const body = await request.json();
-      // Execute processing in background so Meta receives immediate 200 OK within 5s
-      processIncomingWhatsAppPayload(body).catch((err) =>
-        console.error("[WhatsApp Bot Error]", err)
-      );
+      // Await processing in serverless environment before returning response
+      await processIncomingWhatsAppPayload(body);
       return new Response(JSON.stringify({ status: "EVENT_RECEIVED" }), {
         status: 200,
         headers: { "Content-Type": "application/json" },
@@ -71,7 +69,7 @@ export async function handleApiRequest(request: Request): Promise<Response> {
 
       // If customer phone is present, send WhatsApp confirmation message
       if (order.customerPhone) {
-        sendOrderConfirmationToCustomer(order).catch((e) =>
+        await sendOrderConfirmationToCustomer(order).catch((e) =>
           console.error("[Order WhatsApp Notification Error]", e)
         );
       }
