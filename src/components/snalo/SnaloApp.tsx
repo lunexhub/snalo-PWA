@@ -14,6 +14,7 @@ import milkImg from "@/assets/foods/milk.png";
 import cheeseImg from "@/assets/foods/cheese.png";
 import chipsImg from "@/assets/foods/chips.png";
 import grapesImg from "@/assets/foods/grapes.png";
+import { getSupabaseProducts, getSupabaseCategories, getSupabaseStores } from "@/lib/supabase";
 
 type Screen = "splash" | "welcome" | "login" | "home" | "products" | "cart" | "checkout" | "tracking" | "profile" | "notifications";
 type Product = { id: string; name: string; unit: string; price: number; img: string; cat: string };
@@ -201,6 +202,42 @@ export default function SnaloApp() {
     }
     return { apple: 1, banana: 2, potato: 1 };
   });
+  const [products, setProducts] = useState<Product[]>(PRODUCTS);
+  const [categories, setCategories] = useState<{ n: string; e: string }[]>(CATS);
+  const [stores, setStores] = useState<string[]>(SHOPS);
+
+  useEffect(() => {
+    // Fetch live products from Supabase
+    getSupabaseProducts().then((liveProducts) => {
+      if (liveProducts && liveProducts.length > 0) {
+        setProducts(
+          liveProducts.map((p) => ({
+            id: p.id,
+            name: p.name,
+            unit: p.unit,
+            price: Number(p.price),
+            img: p.image_url,
+            cat: p.category,
+          }))
+        );
+      }
+    });
+
+    // Fetch live categories from Supabase
+    getSupabaseCategories().then((liveCats) => {
+      if (liveCats && liveCats.length > 0) {
+        setCategories(liveCats.map((c) => ({ n: c.name, e: c.emoji })));
+      }
+    });
+
+    // Fetch live stores from Supabase
+    getSupabaseStores().then((liveStores) => {
+      if (liveStores && liveStores.length > 0) {
+        setStores(liveStores.map((s) => s.name));
+      }
+    });
+  }, []);
+
   const [customer, setCustomer] = useState(() => ({
     name: waContext.name,
     phone: waContext.phone,
@@ -212,7 +249,10 @@ export default function SnaloApp() {
   const add = (id: string, d = 1) =>
     setCart((c) => { const q = (c[id] ?? 0) + d; const n = { ...c }; if (q <= 0) delete n[id]; else n[id] = q; return n; });
   const count = Object.values(cart).reduce((a, b) => a + b, 0);
-  const subtotal = Object.entries(cart).reduce((s, [id, q]) => s + (PRODUCTS.find((p) => p.id === id)!.price * q), 0);
+  const subtotal = Object.entries(cart).reduce(
+    (s, [id, q]) => s + ((products.find((p) => p.id === id)?.price ?? PRODUCTS.find((p) => p.id === id)?.price ?? 0) * q),
+    0
+  );
 
   useEffect(() => {
     if (waContext.isWhatsApp) return;
@@ -250,10 +290,10 @@ export default function SnaloApp() {
     case "splash": body = <Splash />; break;
     case "welcome": body = <Welcome go={go} isWhatsApp={waContext.isWhatsApp} />; break;
     case "login": body = <Login go={go} isWhatsApp={waContext.isWhatsApp} />; break;
-    case "home": body = <HomeScreen go={go} add={add} cart={cart} count={count} openDrawer={() => setDrawer(true)} waContext={waContext} customer={customer} />; break;
-    case "products": body = <Products go={go} add={add} cart={cart} count={count} />; break;
-    case "cart": body = <Cart go={go} add={add} cart={cart} subtotal={subtotal} />; break;
-    case "checkout": body = <Checkout go={go} subtotal={subtotal} cart={cart} clear={() => setCart({})} waContext={waContext} customer={customer} setCustomer={setCustomer} setLastOrder={setLastOrder} />; break;
+    case "home": body = <HomeScreen go={go} add={add} cart={cart} count={count} openDrawer={() => setDrawer(true)} waContext={waContext} customer={customer} products={products} categories={categories} stores={stores} />; break;
+    case "products": body = <Products go={go} add={add} cart={cart} count={count} products={products} categories={categories} />; break;
+    case "cart": body = <Cart go={go} add={add} cart={cart} subtotal={subtotal} products={products} />; break;
+    case "checkout": body = <Checkout go={go} subtotal={subtotal} cart={cart} clear={() => setCart({})} waContext={waContext} customer={customer} setCustomer={setCustomer} setLastOrder={setLastOrder} products={products} />; break;
     case "tracking": body = <Tracking go={go} waContext={waContext} lastOrder={lastOrder} />; break;
     case "profile": body = <Profile go={go} customer={customer} waContext={waContext} />; break;
     case "notifications": body = <Notifications go={go} />; break;
@@ -470,7 +510,20 @@ function Logo({ className = "" }: { className?: string }) {
 function ProductCard({ p, onAdd }: { p: Product; onAdd: () => void }) {
   return (
     <div className="rounded-2xl bg-card p-3 shadow-card">
-      <div className="grid h-24 place-items-center"><img src={p.img} alt={p.name} loading="lazy" className="h-24 w-full object-contain" /></div>
+      <div className="grid h-24 place-items-center">
+        <img
+          src={p.img}
+          alt={p.name}
+          loading="lazy"
+          className="h-24 w-full object-contain"
+          onError={(e) => {
+            const fallback = PRODUCTS.find((x) => x.id === p.id)?.img;
+            if (fallback && e.currentTarget.src !== fallback) {
+              e.currentTarget.src = fallback;
+            }
+          }}
+        />
+      </div>
       <p className="mt-1 text-sm font-semibold">{p.name}</p>
       <p className="text-xs text-muted-foreground">{p.unit}</p>
       <div className="mt-2 flex items-center justify-between">
@@ -543,7 +596,15 @@ function Login({ go, isWhatsApp }: { go: (s: Screen) => void; isWhatsApp?: boole
   );
 }
 
-type ShopProps = { go: (s: Screen) => void; add: (id: string) => void; cart: Record<string, number>; count: number };
+type ShopProps = {
+  go: (s: Screen) => void;
+  add: (id: string) => void;
+  cart: Record<string, number>;
+  count: number;
+  products?: Product[];
+  categories?: { n: string; e: string }[];
+  stores?: string[];
+};
 
 function HomeScreen({
   go,
@@ -552,6 +613,9 @@ function HomeScreen({
   openDrawer,
   waContext,
   customer,
+  products = PRODUCTS,
+  categories = CATS,
+  stores = SHOPS,
 }: ShopProps & {
   openDrawer: () => void;
   waContext: WhatsAppContext;
@@ -595,7 +659,7 @@ function HomeScreen({
 
       <Section title="Categories" onAll={() => go("products")} />
       <div className="flex gap-2.5 overflow-x-auto no-scrollbar pb-1">
-        {CATS.map((c) => (
+        {categories.map((c) => (
           <button key={c.n} onClick={() => go("products")} className="flex min-w-[76px] flex-1 flex-col items-center gap-1.5 rounded-2xl bg-card py-3 px-2 shadow-card transition active:scale-95">
             <span className="text-2xl">{c.e}</span><span className="text-[11px] font-semibold whitespace-nowrap">{c.n}</span>
           </button>
@@ -604,9 +668,22 @@ function HomeScreen({
 
       <Section title="Best Selling" onAll={() => go("products")} />
       <div className="grid grid-cols-3 gap-2.5 sm:gap-3">
-        {PRODUCTS.slice(0, 3).map((p) => (
+        {products.slice(0, 3).map((p) => (
           <div key={p.id} className="rounded-2xl bg-card p-2.5 shadow-card flex flex-col justify-between">
-            <div className="grid place-items-center"><img src={p.img} alt={p.name} loading="lazy" className="h-16 w-full object-contain" /></div>
+            <div className="grid place-items-center">
+              <img
+                src={p.img}
+                alt={p.name}
+                loading="lazy"
+                className="h-16 w-full object-contain"
+                onError={(e) => {
+                  const fallback = PRODUCTS.find((x) => x.id === p.id)?.img;
+                  if (fallback && e.currentTarget.src !== fallback) {
+                    e.currentTarget.src = fallback;
+                  }
+                }}
+              />
+            </div>
             <p className="mt-1 truncate text-xs font-semibold">{p.name}</p>
             <p className="text-[10px] text-muted-foreground">{p.unit}</p>
             <div className="mt-1 flex items-center justify-between">
@@ -625,7 +702,7 @@ function HomeScreen({
 
       <Section title="Popular Shops" />
       <div className="flex gap-2.5 overflow-x-auto no-scrollbar pb-1">
-        {SHOPS.map((s) => (
+        {stores.map((s) => (
           <button key={s} onClick={() => go("products")} className="flex min-w-[88px] flex-1 flex-col items-center gap-1.5 rounded-2xl bg-card p-3 shadow-card transition hover:brightness-95 active:scale-95 shrink-0">
             <Store className="h-6 w-6 text-primary" /><span className="text-[11px] font-semibold whitespace-nowrap">{s}</span>
           </button>
@@ -643,17 +720,18 @@ function Section({ title, onAll }: { title: string; onAll?: () => void }) {
   );
 }
 
-function Products({ go, add, count }: ShopProps) {
+function Products({ go, add, count, products = PRODUCTS, categories = CATS }: ShopProps) {
   const [cat, setCat] = useState("All");
   const [q, setQ] = useState("");
-  const list = PRODUCTS.filter((p) => (cat === "All" || p.cat === cat) && p.name.toLowerCase().includes(q.toLowerCase()));
+  const catNames = ["All", ...Array.from(new Set(categories.map((c) => c.n)))];
+  const list = products.filter((p) => (cat === "All" || p.cat.toLowerCase() === cat.toLowerCase()) && p.name.toLowerCase().includes(q.toLowerCase()));
   return (
     <div className="pb-6">
       <Header title="Products" sub="Snalo Fast Delivery" back={() => go("home")} right={<CartBtn count={count} go={go} />} />
       <div className="px-5">
         <label className="flex items-center gap-3 rounded-2xl bg-muted px-4 py-3"><Search className="h-4 w-4 text-primary" /><input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search groceries..." className="flex-1 bg-transparent text-sm outline-none" /></label>
         <div className="mt-4 flex gap-2 overflow-x-auto no-scrollbar">
-          {["All", "Fruits", "Vegetables", "Dairy", "Snacks"].map((c) => (
+          {catNames.map((c) => (
             <button key={c} onClick={() => setCat(c)} className={`shrink-0 rounded-full px-4 py-1.5 text-xs font-semibold transition ${cat === c ? "bg-primary text-primary-foreground" : "bg-muted text-foreground"}`}>{c}</button>
           ))}
         </div>
@@ -666,7 +744,19 @@ function Products({ go, add, count }: ShopProps) {
   );
 }
 
-function Cart({ go, add, cart, subtotal }: { go: (s: Screen) => void; add: (id: string, d?: number) => void; cart: Record<string, number>; subtotal: number }) {
+function Cart({
+  go,
+  add,
+  cart,
+  subtotal,
+  products = PRODUCTS,
+}: {
+  go: (s: Screen) => void;
+  add: (id: string, d?: number) => void;
+  cart: Record<string, number>;
+  subtotal: number;
+  products?: Product[];
+}) {
   const items = Object.entries(cart);
   const fee = subtotal > 0 ? 15 : 0;
   return (
@@ -678,10 +768,23 @@ function Cart({ go, add, cart, subtotal }: { go: (s: Screen) => void; add: (id: 
             <button onClick={() => go("products")} className="mt-3 text-sm font-semibold text-primary">Start shopping →</button></div>
         )}
         {items.map(([id, q]) => {
-          const p = PRODUCTS.find((x) => x.id === id)!;
+          const p = products.find((x) => x.id === id) || PRODUCTS.find((x) => x.id === id)!;
           return (
             <div key={id} className="flex items-center gap-3 rounded-2xl bg-card p-3 shadow-card">
-              <div className="grid h-16 w-16 shrink-0 place-items-center rounded-xl bg-muted"><img src={p.img} alt={p.name} loading="lazy" className="h-14 w-14 object-contain" /></div>
+              <div className="grid h-16 w-16 shrink-0 place-items-center rounded-xl bg-muted">
+                <img
+                  src={p.img}
+                  alt={p.name}
+                  loading="lazy"
+                  className="h-14 w-14 object-contain"
+                  onError={(e) => {
+                    const fallback = PRODUCTS.find((x) => x.id === p.id)?.img;
+                    if (fallback && e.currentTarget.src !== fallback) {
+                      e.currentTarget.src = fallback;
+                    }
+                  }}
+                />
+              </div>
               <div className="flex-1"><p className="font-semibold">{p.name}</p><p className="text-xs text-muted-foreground">{p.unit}</p><p className="mt-1 font-bold text-primary">R {p.price}</p></div>
               <div className="flex flex-col items-center gap-1">
                 <button onClick={() => add(id, 1)} aria-label="Increase" className="grid h-7 w-7 place-items-center rounded-lg bg-primary text-primary-foreground"><Plus className="h-4 w-4" /></button>
@@ -717,6 +820,7 @@ function Checkout({
   customer,
   setCustomer,
   setLastOrder,
+  products = PRODUCTS,
 }: {
   go: (s: Screen) => void;
   subtotal: number;
@@ -726,6 +830,7 @@ function Checkout({
   customer: { name: string; phone: string; address: string };
   setCustomer: React.Dispatch<React.SetStateAction<{ name: string; phone: string; address: string }>>;
   setLastOrder: (o: OrderData) => void;
+  products?: Product[];
 }) {
   const [pay, setPay] = useState(waContext.isWhatsApp ? "wa" : "card");
   const [promo, setPromo] = useState(false);
@@ -743,7 +848,7 @@ function Checkout({
   const handlePlaceOrder = (sendToWhatsApp = false) => {
     const orderId = `SN-WA${Math.floor(1000 + Math.random() * 9000)}`;
     const itemsList: OrderItem[] = Object.entries(cart).map(([id, q]) => {
-      const p = PRODUCTS.find((x) => x.id === id);
+      const p = products.find((x) => x.id === id) || PRODUCTS.find((x) => x.id === id);
       return {
         id,
         name: p?.name || id,

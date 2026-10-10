@@ -129,6 +129,25 @@ export async function handleApiRequest(request: Request): Promise<Response> {
     }
   }
 
+  // 6. Real Products from Supabase (GET /api/products)
+  if (path === "/api/products" && request.method === "GET") {
+    try {
+      const products = await fetchProductsFromSupabase();
+      return new Response(JSON.stringify(products), {
+        status: 200,
+        headers: {
+          "Content-Type": "application/json",
+          "Cache-Control": "public, max-age=60",
+        },
+      });
+    } catch (err) {
+      return new Response(JSON.stringify({ error: String(err) }), {
+        status: 500,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+  }
+
   return new Response("Not Found", { status: 404 });
 }
 
@@ -209,6 +228,41 @@ async function processIncomingWhatsAppPayload(payload: {
   await recordMessageInSupabase(from, customerName, "assistant", replyText, phoneNumberId, null);
 }
 
+async function fetchProductsFromSupabase(): Promise<Array<{
+  id: string;
+  name: string;
+  unit: string;
+  price: number;
+  category: string;
+  image_url: string;
+  in_stock: boolean;
+}>> {
+  const defaultList = [
+    { id: "apple", name: "Fresh Apples", unit: "1 Kg", price: 25, category: "Fruits", image_url: "", in_stock: true },
+    { id: "banana", name: "Bananas", unit: "1 Kg", price: 18, category: "Fruits", image_url: "", in_stock: true },
+    { id: "potato", name: "Potatoes", unit: "1 Kg", price: 12, category: "Vegetables", image_url: "", in_stock: true },
+    { id: "carrot", name: "Carrots", unit: "500 g", price: 10, category: "Vegetables", image_url: "", in_stock: true },
+    { id: "milk", name: "Fresh Milk", unit: "2 L", price: 32, category: "Dairy", image_url: "", in_stock: true },
+    { id: "cheese", name: "Cheddar", unit: "400 g", price: 55, category: "Dairy", image_url: "", in_stock: true },
+    { id: "chips", name: "Potato Chips", unit: "125 g", price: 20, category: "Snacks", image_url: "", in_stock: true },
+    { id: "grapes", name: "Red Grapes", unit: "500 g", price: 35, category: "Fruits", image_url: "", in_stock: true },
+  ];
+
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/products?select=*&order=id.asc`, {
+      headers: {
+        apikey: SUPABASE_KEY,
+        Authorization: `Bearer ${SUPABASE_KEY}`,
+      },
+    });
+    if (!res.ok) return defaultList;
+    const data = await res.json();
+    return Array.isArray(data) && data.length > 0 ? data : defaultList;
+  } catch {
+    return defaultList;
+  }
+}
+
 async function generateAiReply(
   userMessage: string,
   customerName: string,
@@ -216,20 +270,18 @@ async function generateAiReply(
   history: Array<{ role: string; content: string }>
 ): Promise<string> {
   const storeLink = `${APP_URL}/?source=whatsapp&phone=${customerPhone}&name=${encodeURIComponent(customerName)}`;
+  const products = await fetchProductsFromSupabase();
+
+  const menuList = products
+    .map((p) => `• ${p.name} (${p.unit}): R ${p.price}${p.in_stock ? "" : " (Temporarily Out of Stock)"}`)
+    .join("\n");
 
   const systemPrompt = `You are Snalo, the official ultra-fast AI delivery assistant for Snalo Fast Delivery in Johannesburg, South Africa.
 
 You help customers order groceries, check prices, find fresh foods, and get their orders delivered in 15–20 minutes!
 
-OUR MENU & IN-STOCK GROCERIES:
-• Fresh Apples (1 Kg): R 25
-• Bananas (1 Kg): R 18
-• Potatoes (1 Kg): R 12
-• Carrots (500 g): R 10
-• Fresh Milk (2 L): R 32
-• Cheddar Cheese (400 g): R 55
-• Potato Chips (125 g): R 20
-• Red Grapes (500 g): R 35
+OUR LIVE SUPABASE GROCERY MENU:
+${menuList}
 
 DELIVERY & PAYMENT:
 • Delivery Speed: 15–20 minutes
