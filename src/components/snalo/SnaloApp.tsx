@@ -66,6 +66,18 @@ const PRODUCTS: Product[] = [
 const CATS = [{ n: "Groceries", e: "🛒" }, { n: "Fruits", e: "🍓" }, { n: "Vegetables", e: "🥦" }, { n: "Dairy", e: "🥛" }];
 const SHOPS = ["Pick n Pay", "Shoprite", "Checkers", "Spar"];
 
+const DEFAULT_BOT_PHONE = "27718765434";
+
+function normalizeBotPhone(val?: string | null): string {
+  if (!val) return DEFAULT_BOT_PHONE;
+  const digits = val.replace(/[^0-9]/g, "");
+  // Map Meta Phone Number ID to actual phone number
+  if (digits === "1320939644434475" || digits === "122093671472491331") {
+    return DEFAULT_BOT_PHONE;
+  }
+  return digits || DEFAULT_BOT_PHONE;
+}
+
 function getWhatsAppContext(): WhatsAppContext {
   if (typeof window === "undefined") {
     return {
@@ -73,7 +85,7 @@ function getWhatsAppContext(): WhatsAppContext {
       phone: "",
       name: "John Smith",
       address: "12 Main Street, Johannesburg, SA",
-      botPhone: "27821234567",
+      botPhone: DEFAULT_BOT_PHONE,
       ref: "",
     };
   }
@@ -97,7 +109,8 @@ function getWhatsAppContext(): WhatsAppContext {
   const rawName = params.get("name");
   const name = rawName || (phone ? `WhatsApp User (${phone.slice(-4)})` : "John Smith");
   const address = params.get("address") || "12 Main Street, Johannesburg, SA";
-  const botPhone = (params.get("bot") || params.get("business_phone") || "27821234567").replace(/[^0-9]/g, "");
+  const rawBot = params.get("bot") || params.get("business_phone");
+  const botPhone = normalizeBotPhone(rawBot);
   const ref = params.get("ref") || params.get("session_id") || "";
 
   const targetScreen = params.get("screen") as Screen | null;
@@ -124,7 +137,7 @@ function getWhatsAppContext(): WhatsAppContext {
     phone,
     name,
     address,
-    botPhone: botPhone || "27821234567",
+    botPhone,
     ref,
     initialScreen,
     initialCart,
@@ -652,7 +665,16 @@ function HomeScreen({
         <p className="mt-1 text-xs opacity-90">Groceries, Foods & More</p>
         <div className="mt-3 flex items-center gap-2">
           <button onClick={() => go("products")} className="rounded-full bg-background px-4 py-1.5 text-xs font-semibold text-primary active:scale-95 transition">Order Now →</button>
-          <a href={`https://wa.me/${waContext.botPhone}?text=Hi%2C%20I%27d%20like%20to%20order%20groceries`} target="_blank" rel="noopener noreferrer" aria-label="Order on WhatsApp" className="grid h-8 w-8 place-items-center rounded-full bg-success text-primary-foreground shadow-card transition active:scale-90"><WhatsAppIcon className="h-4 w-4" /></a>
+          <a
+            href={`https://wa.me/${waContext.botPhone}?text=Hi`}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="Order on WhatsApp with Hi"
+            className="flex items-center gap-1.5 rounded-full bg-[#25D366] px-3.5 py-1.5 text-xs font-bold text-white shadow-card transition active:scale-95 hover:brightness-105"
+          >
+            <WhatsAppIcon className="h-4 w-4 fill-current" />
+            <span>Chat Hi</span>
+          </a>
         </div>
         <img src={basket} alt="" width={1024} height={1024} className="absolute -bottom-3 -right-4 w-36 sm:w-40 pointer-events-none" />
       </div>
@@ -1098,8 +1120,8 @@ function Tracking({
         <div className="mt-4 flex items-center gap-3 rounded-2xl bg-muted p-3">
           <div className="grid h-10 w-10 place-items-center rounded-full bg-primary text-primary-foreground shrink-0"><User className="h-5 w-5" /></div>
           <div className="flex-1 min-w-0"><p className="text-sm font-semibold truncate">John Rider</p><p className="text-xs text-muted-foreground">Delivery Partner</p></div>
-          <a href="tel:+27821234567" aria-label="Call rider" className="grid h-9 w-9 place-items-center rounded-full bg-primary text-primary-foreground active:scale-90 transition"><Phone className="h-4 w-4" /></a>
-          <a href={`https://wa.me/27821234567?text=Hi%2C%20I%27m%20asking%20about%20my%20Snalo%20order%20%23${orderId}`} target="_blank" rel="noopener noreferrer" aria-label="Chat on WhatsApp" className="grid h-9 w-9 place-items-center rounded-full bg-success text-primary-foreground active:scale-90 transition"><WhatsAppIcon className="h-4 w-4" /></a>
+          <a href={`tel:+${waContext.botPhone}`} aria-label="Call rider" className="grid h-9 w-9 place-items-center rounded-full bg-primary text-primary-foreground active:scale-90 transition"><Phone className="h-4 w-4" /></a>
+          <a href={`https://wa.me/${waContext.botPhone}?text=Hi%2C%20I%27m%20asking%20about%20my%20Snalo%20order%20%23${orderId}`} target="_blank" rel="noopener noreferrer" aria-label="Chat on WhatsApp" className="grid h-9 w-9 place-items-center rounded-full bg-success text-primary-foreground active:scale-90 transition"><WhatsAppIcon className="h-4 w-4" /></a>
         </div>
         <div className="mt-5 flex justify-between">
           {steps.map(([l, t], i) => (

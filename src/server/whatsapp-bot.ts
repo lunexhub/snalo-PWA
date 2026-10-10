@@ -22,8 +22,12 @@ const VERIFY_TOKEN =
 
 const APP_URL = "https://snalo-pwa.vercel.app";
 
-// Default phone number ID fallback if needed
-let lastKnownPhoneNumberId = "122093671472491331";
+// Default phone number ID fallback (Meta Cloud API ID)
+let lastKnownPhoneNumberId =
+  process.env.WHATSAPP_PHONE_NUMBER_ID || "1320939644434475";
+
+const BOT_PHONE_NUMBER =
+  process.env.WHATSAPP_PHONE_NUMBER || "27718765434";
 
 export async function handleApiRequest(request: Request): Promise<Response> {
   const url = new URL(request.url);
@@ -352,9 +356,9 @@ Please check your confirmation message or order digits, or tap below to open the
     const helpMsg = `Need help or have questions about delivery? Our support team is here for you! 📞
 
 Click below to chat directly with our support team on WhatsApp:
-👉 https://wa.me/27821234567?text=${encodeURIComponent(`Hi Snalo Support, I need assistance (Customer Phone: ${from})`)}
+👉 https://wa.me/${BOT_PHONE_NUMBER}?text=${encodeURIComponent(`Hi Snalo Support, I need assistance (Customer Phone: ${from})`)}
 
-Or call us anytime at: *+27 82 123 4567*
+Or call us anytime at: *+27 71 876 5434*
 🕒 *Customer Support Hours:* 7:00 AM – 10:00 PM`;
 
     await sendWhatsAppTextMessage(phoneNumberId, from, helpMsg);
