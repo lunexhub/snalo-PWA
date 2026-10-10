@@ -84,7 +84,7 @@ function getWhatsAppContext(): WhatsAppContext {
       isWhatsApp: false,
       phone: "",
       name: "John Smith",
-      address: "12 Main Street, Johannesburg, SA",
+      address: "12 Main Street, SA",
       botPhone: DEFAULT_BOT_PHONE,
       ref: "",
     };
@@ -108,7 +108,7 @@ function getWhatsAppContext(): WhatsAppContext {
   const phone = params.get("phone") || params.get("wa_id") || "";
   const rawName = params.get("name");
   const name = rawName || (phone ? `WhatsApp User (${phone.slice(-4)})` : "John Smith");
-  const address = params.get("address") || "12 Main Street, Johannesburg, SA";
+  const address = params.get("address") || "12 Main Street, SA";
   const rawBot = params.get("bot") || params.get("business_phone");
   const botPhone = normalizeBotPhone(rawBot);
   const ref = params.get("ref") || params.get("session_id") || "";
@@ -717,7 +717,7 @@ function HomeScreen({
 
       <div className="mt-4 flex items-center gap-3 rounded-2xl bg-accent p-3">
         <Truck className="h-6 w-6 text-primary shrink-0" />
-        <div className="flex-1"><p className="text-sm font-bold text-primary">FREE DELIVERY</p><p className="text-xs text-muted-foreground">On orders above R150</p></div>
+        <div className="flex-1"><p className="text-sm font-bold text-primary">FAST 15–20 MIN DELIVERY</p><p className="text-xs text-muted-foreground">Straight to your doorstep</p></div>
         <button onClick={() => go("products")} className="rounded-full bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground active:scale-95 transition">Shop Now</button>
       </div>
 
@@ -857,7 +857,8 @@ function Checkout({
   const [promo, setPromo] = useState(false);
   const [editingAddress, setEditingAddress] = useState(false);
   const [tempAddress, setTempAddress] = useState(customer.address);
-  const fee = promo || subtotal >= 150 ? 0 : 15;
+  const fee = 15;
+  const discount = promo ? 10 : 0;
 
   const methods = [
     { id: "wa", t: "Confirm & Pay via WhatsApp", s: "Send full order directly to WhatsApp bot", I: WhatsAppIcon },
@@ -879,7 +880,7 @@ function Checkout({
       };
     });
 
-    const total = subtotal + fee + 5;
+    const total = Math.max(0, subtotal - discount) + fee + 5;
     const orderData: OrderData = {
       orderId,
       items: itemsList,
@@ -1026,21 +1027,22 @@ function Checkout({
 
         <div className="mt-3 flex items-center gap-2 rounded-2xl bg-warning/15 p-3 text-sm">
           <Tag className="h-4 w-4 text-warning" />
-          <span className="flex-1">Free delivery on orders above R150</span>
-          <button onClick={() => setPromo(true)} className="font-semibold text-primary">
-            {promo ? "Applied" : "Apply"}
+          <span className="flex-1">Promo Code: SAVE10 (R10 off)</span>
+          <button onClick={() => setPromo(!promo)} className="font-semibold text-primary">
+            {promo ? "Applied (-R10)" : "Apply"}
           </button>
         </div>
 
         <h3 className="mb-2 mt-5 font-bold">Order Summary</h3>
         <div className="rounded-2xl bg-card p-4 shadow-card">
           <Row l="Subtotal" r={`R ${subtotal}`} />
+          {promo && <Row l="Discount (SAVE10)" r="-R 10" />}
           <Row l="Delivery Fee" r={`R ${fee}`} />
           <Row l="Service Fee" r="R 5" />
           <div className="my-2 border-t" />
           <div className="flex justify-between font-bold">
             <span>Total</span>
-            <span className="text-primary">R {subtotal + fee + 5}</span>
+            <span className="text-primary">R {Math.max(0, subtotal - discount) + fee + 5}</span>
           </div>
         </div>
 
@@ -1262,7 +1264,7 @@ function Drawer({
 
 const NOTIFS = [
   { day: "Today", t: "Your order is on the way", s: "Estimated arrival in 15 mins", time: "4:15 PM", I: Bike, k: "Orders", c: "bg-warning/15 text-warning" },
-  { day: "Today", t: "Free delivery available", s: "On orders above R150", time: "2:30 PM", I: Tag, k: "Offers", c: "bg-accent text-primary" },
+  { day: "Today", t: "20% off fresh produce", s: "Special discount on all fruits & veg", time: "2:30 PM", I: Tag, k: "Offers", c: "bg-accent text-primary" },
   { day: "Today", t: "Order delivered", s: "Your order #SN1024 was delivered successfully.", time: "12:45 PM", I: CheckCircle2, k: "Orders", c: "bg-success/15 text-success" },
   { day: "Yesterday", t: "Order confirmed", s: "Your order #SN1024 has been confirmed.", time: "8:20 PM", I: Receipt, k: "Orders", c: "bg-warning/15 text-warning" },
   { day: "Yesterday", t: "Weekend special offer!", s: "Get 20% off on all fruits & vegetables.", time: "6:10 PM", I: Gift, k: "Offers", c: "bg-accent text-primary" },

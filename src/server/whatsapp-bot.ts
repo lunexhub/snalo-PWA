@@ -274,7 +274,7 @@ async function processIncomingWhatsAppPayload(payload: {
       /^(good\s*(morning|afternoon|evening))$/i.test(lower));
 
   if (isGreeting) {
-    const greetingText = `Hi ${customerName}! 🛒 Welcome to Snalo Fast Delivery in Johannesburg.\n\nChoose below what you are interested in:`;
+    const greetingText = `Hi ${customerName}! 🛒 Welcome to Snalo Fast Delivery.\n\nChoose below what you are interested in:`;
     const buttons = [
       { id: "btn_order", title: "Place an order" },
       { id: "btn_track", title: "Track my order" },
@@ -287,7 +287,7 @@ async function processIncomingWhatsAppPayload(payload: {
   }
 
   if (isPlaceOrder) {
-    const bodyText = `Welcome to Snalo Fast Delivery in Johannesburg! 🛒\n\nTap the button below to open your store — recognized automatically with 0 login required.\n\n⚡ Delivery in 15–20 minutes to your door\n🎁 FREE delivery on orders above R 150!`;
+    const bodyText = `Welcome to Snalo Fast Delivery! 🛒\n\nTap the button below to open your store — recognized automatically with 0 login required.\n\n⚡ Delivery in 15–20 minutes to your door!`;
 
     await sendWhatsAppCtaUrlButton(phoneNumberId, from, {
       headerText: "🛒 Snalo Fast Delivery",
@@ -304,7 +304,7 @@ async function processIncomingWhatsAppPayload(payload: {
     const recent = await fetchRecentOrderByPhone(from);
     if (recent) {
       const trackingUrl = `${APP_URL}/?screen=tracking&order=${recent.id}`;
-      const bodyText = `📦 *Your Recent Snalo Order #${recent.id}*\n━━━━━━━━━━━━━━━━━━\n📊 *Status:* ${String(recent.status || "On The Way").toUpperCase()}\n💵 *Total:* R ${recent.total || 0} (${recent.payment_method || "COD"})\n📍 *Address:* ${recent.delivery_address || "Johannesburg"}\n⏱ *Delivery Speed:* 15–20 Mins by John Rider\n\nTap below to view live GPS tracking on map!`;
+      const bodyText = `📦 *Your Recent Snalo Order #${recent.id}*\n━━━━━━━━━━━━━━━━━━\n📊 *Status:* ${String(recent.status || "On The Way").toUpperCase()}\n💵 *Total:* R ${recent.total || 0} (${recent.payment_method || "COD"})\n📍 *Address:* ${recent.delivery_address || "Your Address"}\n⏱ *Delivery Speed:* 15–20 Mins by John Rider\n\nTap below to view live GPS tracking on map!`;
 
       await sendWhatsAppCtaUrlButton(phoneNumberId, from, {
         headerText: `📦 Order #${recent.id}`,
@@ -327,7 +327,7 @@ async function processIncomingWhatsAppPayload(payload: {
     const order = await fetchOrderById(matchedOrderId);
     if (order) {
       const trackingUrl = `${APP_URL}/?screen=tracking&order=${order.id}`;
-      const bodyText = `📦 *Order #${order.id} Found!*\n━━━━━━━━━━━━━━━━━━\n📊 *Status:* ${String(order.status || "Placed").toUpperCase()}\n💵 *Total:* R ${order.total || 0} (${order.payment_method || "COD"})\n📍 *Address:* ${order.delivery_address || "Johannesburg"}\n⏱ *Estimated Arrival:* 15–20 Mins\n\nTap below to view live GPS tracking on map:`;
+      const bodyText = `📦 *Order #${order.id} Found!*\n━━━━━━━━━━━━━━━━━━\n📊 *Status:* ${String(order.status || "Placed").toUpperCase()}\n💵 *Total:* R ${order.total || 0} (${order.payment_method || "COD"})\n📍 *Address:* ${order.delivery_address || "Your Address"}\n⏱ *Estimated Arrival:* 15–20 Mins\n\nTap below to view live GPS tracking on map:`;
 
       await sendWhatsAppCtaUrlButton(phoneNumberId, from, {
         headerText: `📦 Order #${order.id}`,
@@ -421,7 +421,7 @@ async function generateAiReply(
     .map((p) => `• ${p.name} (${p.unit}): R ${p.price}${p.in_stock ? "" : " (Temporarily Out of Stock)"}`)
     .join("\n");
 
-  const systemPrompt = `You are Snalo, the official ultra-fast AI delivery assistant for Snalo Fast Delivery in Johannesburg, South Africa.
+  const systemPrompt = `You are Snalo, the official ultra-fast AI delivery assistant for Snalo Fast Delivery.
 
 You help customers order groceries, check prices, find fresh foods, and get their orders delivered in 15–20 minutes!
 
@@ -430,12 +430,11 @@ ${menuList}
 
 CURRENT SPECIALS & PROMOTIONS:
 • 20% discount special on all fresh fruits & vegetables this week!
-• FREE Delivery on all orders above R 150 (normal delivery is R 15).
-• Ultra-fast 15–20 minutes delivery across Johannesburg!
+• Ultra-fast 15–20 minutes delivery straight to your door!
 
 DELIVERY & PAYMENT:
 • Delivery Speed: 15–20 minutes
-• Delivery Fee: R 15 (FREE delivery on orders over R 150!)
+• Delivery Fee: R 15 flat rate
 • Payment: Cash on Delivery, WhatsApp Pay, or Card
 
 CUSTOMER DETAILS:
@@ -446,10 +445,10 @@ CUSTOMER DETAILS:
 INSTRUCTIONS:
 1. Speak in a warm, helpful, energetic South African tone (e.g. use occasional friendly phrases like "Howzit", "Sharp sharp", "No problem at all!").
 2. Format cleanly using WhatsApp Markdown (*bold*, bullet points, line breaks).
-3. If the user asks about specials, discounts, or deals, tell them about the 20% off fruits & veggies and FREE delivery over R 150!
+3. If the user asks about specials, discounts, or deals, tell them about the 20% off fruits & veggies special!
 4. Whenever the user asks to see groceries, wants to buy, or asks how to order, ALWAYS share their personalized 1-tap store link:
    👉 ${storeLink}
-5. If the user tells you their order directly (e.g. "I want 2 milk and apples"), calculate the total price including delivery, tell them the total, and provide the store link to confirm delivery address.
+5. If the user tells you their order directly (e.g. "I want 2 milk and apples"), calculate the total price including delivery (R 15 flat rate), tell them the total, and provide the store link to confirm delivery address.
 6. Keep answers concise, readable on a phone screen, and action-oriented.`;
 
   const messages = [
@@ -484,7 +483,7 @@ INSTRUCTIONS:
 Tap here to browse groceries and order in 1 tap:
 👉 ${storeLink}
 
-We deliver in 15–20 minutes across Johannesburg! 🚀`;
+We deliver in 15–20 minutes straight to your door! 🚀`;
     }
 
     const data = await res.json();
@@ -714,7 +713,7 @@ async function sendOrderConfirmationToCustomer(order: {
     .map((item) => `• ${item.name} x${item.quantity}`)
     .join("\n");
 
-  const bodyText = `Thank you ${order.customerName || "Customer"}! We received your order.\n\n*Items:*\n${itemsText || "• Fresh Groceries"}\n\n💵 *Total:* R ${order.total || 0} (${order.paymentMethod || "COD"})\n📍 *Address:* ${order.address || "Johannesburg"}\n⏱ *Estimated Delivery:* 15–20 Mins by John Rider`;
+  const bodyText = `Thank you ${order.customerName || "Customer"}! We received your order.\n\n*Items:*\n${itemsText || "• Fresh Groceries"}\n\n💵 *Total:* R ${order.total || 0} (${order.paymentMethod || "COD"})\n📍 *Address:* ${order.address || "Your Address"}\n⏱ *Estimated Delivery:* 15–20 Mins by John Rider`;
   const trackingUrl = `${APP_URL}/?screen=tracking&order=${orderId}`;
 
   await sendWhatsAppCtaUrlButton(lastKnownPhoneNumberId, order.customerPhone, {
@@ -803,7 +802,7 @@ async function saveOrderToSupabase(order: {
         id: orderId,
         phone: order.customerPhone || null,
         customer_name: order.customerName || "Customer",
-        delivery_address: order.address || "Johannesburg",
+        delivery_address: order.address || "Customer Address",
         items: order.items || [],
         subtotal: order.subtotal || 0,
         delivery_fee: order.deliveryFee || 0,
