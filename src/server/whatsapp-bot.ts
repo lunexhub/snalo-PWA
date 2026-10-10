@@ -199,6 +199,8 @@ async function processIncomingWhatsAppPayload(payload: {
   const customerName = value.contacts?.[0]?.profile?.name || "Friend";
 
   let userText = "";
+  let buttonId = "";
+
   if (incomingMessage.type === "text" && incomingMessage.text?.body) {
     userText = incomingMessage.text.body.trim();
   } else if (incomingMessage.type === "interactive") {
@@ -206,25 +208,154 @@ async function processIncomingWhatsAppPayload(payload: {
       incomingMessage.interactive?.button_reply?.title ||
       incomingMessage.interactive?.list_reply?.title ||
       "";
+    buttonId =
+      incomingMessage.interactive?.button_reply?.id ||
+      incomingMessage.interactive?.list_reply?.id ||
+      "";
   }
 
-  if (!userText) return;
+  if (!userText && !buttonId) return;
 
-  console.log(`[WhatsApp Incoming] From: ${from} (${customerName}) Text: "${userText}"`);
+  console.log(`[WhatsApp Incoming] From: ${from} (${customerName}) Text: "${userText}" ButtonID: "${buttonId}"`);
 
   // 1. Record incoming user message in Supabase
-  await recordMessageInSupabase(from, customerName, "user", userText, phoneNumberId, incomingMessage);
+  await recordMessageInSupabase(from, customerName, "user", userText || buttonId, phoneNumberId, incomingMessage);
 
   // 2. Fetch conversation context from Supabase (last 8 messages)
   const history = await fetchConversationHistory(from);
 
-  // 3. Generate AI response using OpenAI gpt-4o-mini
+  const lower = userText.toLowerCase().trim();
+  const storeLink = `${APP_URL}/?source=whatsapp&phone=${from}&name=${encodeURIComponent(customerName)}`;
+
+  // Flow A: Greeting / Hello / Menu / First Contact -> Send Interactive Reply Buttons
+  const isGreeting =
+    buttonId === "btn_menu" ||
+    /^(hi|hello|hey|howzit|hola|good\s*(morning|afternoon|evening)|start|menu|help me)$/i.test(lower) ||
+    (history.length === 0 && lower.length < 25);
+
+  if (isGreeting && buttonId !== "btn_order" && buttonId !== "btn_track" && buttonId !== "btn_help") {
+    const greetingText = `Hi ${customerName}! 🛒 Welcome to Snalo Fast Delivery in Johannesburg.\n\nChoose below what you are interested in:`;
+    const buttons = [
+      { id: "btn_order", title: "Place an order" },
+      { id: "btn_track", title: "Track my order" },
+      { id: "btn_help", title: "Help" },
+    ];
+
+    await sendWhatsAppReplyButtons(phoneNumberId, from, greetingText, buttons);
+    await recordMessageInSupabase(from, customerName, "assistant", greetingText, phoneNumberId, { buttons });
+    return;
+  }
+
+  // Flow B: Place an order (Button tapped or typed)
+  const isPlaceOrder =
+    buttonId === "btn_order" ||
+    lower === "place an order" ||
+    lower === "order" ||
+    lower === "buy groceries" ||
+    lower === "place order" ||
+    lower === "shop";
+
+  if (isPlaceOrder) {
+    const orderPrompt = `🛒 *Welcome to Snalo Fast Delivery!*
+
+Tap below to open your interactive store in 1 tap — your WhatsApp number is recognized automatically with no login required:
+
+👉 ${storeLink}
+
+⚡ Pick your groceries and we deliver to your door in *15–20 minutes* across Johannesburg!
+🎁 *FREE delivery* on orders above R 150!`;
+
+    await sendWhatsAppTextMessage(phoneNumberId, from, orderPrompt);
+    await recordMessageInSupabase(from, customerName, "assistant", orderPrompt, phoneNumberId, null);
+    return;
+  }
+
+  // Flow C: Track my order (Button tapped or typed)
+  const isTrack =
+    buttonId === "btn_track" ||
+    lower === "track my order" ||
+    lower === "track order" ||
+    lower === "tracking";
+
+  if (isTrack) {
+    const recent = await fetchRecentOrderByPhone(from);
+    let trackMessage = "";
+
+    if (recent) {
+      trackMessage = `📦 *Your Recent Snalo Order #${recent.id}*
+━━━━━━━━━━━━━━━━━━
+📊 *Status:* ${String(recent.status || "On The Way").toUpperCase()}
+💵 *Total:* R ${recent.total || 0} (${recent.payment_method || "COD"})
+📍 *Address:* ${recent.delivery_address || "Johannesburg"}
+⏱ *Delivery Speed:* 15–20 Mins by John Rider
+
+Live tracking on map:
+👉 ${APP_URL}/?screen=tracking&order=${recent.id}
+
+Have another order number? Just reply with it (e.g. *SN-1024*)!`;
+    } else {
+      trackMessage = `📦 *Track Your Snalo Order*
+
+Please reply with your *Order Number* (e.g., *SN-1024* or your order digits) and I'll find its live delivery status for you right away!`;
+    }
+
+    await sendWhatsAppTextMessage(phoneNumberId, from, trackMessage);
+    await recordMessageInSupabase(from, customerName, "assistant", trackMessage, phoneNumberId, null);
+    return;
+  }
+
+  // Flow D: User replied with an order number (e.g. SN-8812, SN-TEST, or 4-digit code)
+  const orderRegex = /^(sn[-_]?[a-z0-9]+|\d{4,8})$/i;
+  if (orderRegex.test(lower)) {
+    const order = await fetchOrderById(userText);
+    let replyMsg = "";
+    if (order) {
+      replyMsg = `📦 *Order #${order.id} Found!*
+━━━━━━━━━━━━━━━━━━
+📊 *Status:* ${String(order.status || "Placed").toUpperCase()}
+💵 *Total:* R ${order.total || 0} (${order.payment_method || "COD"})
+📍 *Address:* ${order.delivery_address || "Johannesburg"}
+⏱ *Estimated Arrival:* 15–20 Mins
+
+Live GPS map tracking:
+👉 ${APP_URL}/?screen=tracking&order=${order.id}`;
+    } else {
+      replyMsg = `We couldn't find order *#${userText.toUpperCase()}*.
+
+Please check your confirmation message or order digits, or tap below to open the store:
+👉 ${storeLink}`;
+    }
+    await sendWhatsAppTextMessage(phoneNumberId, from, replyMsg);
+    await recordMessageInSupabase(from, customerName, "assistant", replyMsg, phoneNumberId, null);
+    return;
+  }
+
+  // Flow E: Help / Support (Button tapped or typed)
+  const isHelp =
+    buttonId === "btn_help" ||
+    lower === "help" ||
+    lower === "support" ||
+    lower === "customer care" ||
+    lower === "agent";
+
+  if (isHelp) {
+    const helpMsg = `Need help or have questions about delivery? Our support team is here for you! 📞
+
+Click below to chat directly with our support team on WhatsApp:
+👉 https://wa.me/27821234567?text=${encodeURIComponent(`Hi Snalo Support, I need assistance (Customer Phone: ${from})`)}
+
+Or call us anytime at: *+27 82 123 4567*
+🕒 *Customer Support Hours:* 7:00 AM – 10:00 PM`;
+
+    await sendWhatsAppTextMessage(phoneNumberId, from, helpMsg);
+    await recordMessageInSupabase(from, customerName, "assistant", helpMsg, phoneNumberId, null);
+    return;
+  }
+
+  // Flow F: All other questions ("are there any specials?", "how much are bananas and milk?", "do you have cheese?")
+  // -> OpenAI gpt-4o-mini generates intelligent contextual response with live Supabase products & specials!
   const replyText = await generateAiReply(userText, customerName, from, history);
-
-  // 4. Send reply via Meta WhatsApp API
   await sendWhatsAppTextMessage(phoneNumberId, from, replyText);
-
-  // 5. Record assistant response in Supabase
   await recordMessageInSupabase(from, customerName, "assistant", replyText, phoneNumberId, null);
 }
 
@@ -283,6 +414,11 @@ You help customers order groceries, check prices, find fresh foods, and get thei
 OUR LIVE SUPABASE GROCERY MENU:
 ${menuList}
 
+CURRENT SPECIALS & PROMOTIONS:
+• 20% discount special on all fresh fruits & vegetables this week!
+• FREE Delivery on all orders above R 150 (normal delivery is R 15).
+• Ultra-fast 15–20 minutes delivery across Johannesburg!
+
 DELIVERY & PAYMENT:
 • Delivery Speed: 15–20 minutes
 • Delivery Fee: R 15 (FREE delivery on orders over R 150!)
@@ -296,10 +432,11 @@ CUSTOMER DETAILS:
 INSTRUCTIONS:
 1. Speak in a warm, helpful, energetic South African tone (e.g. use occasional friendly phrases like "Howzit", "Sharp sharp", "No problem at all!").
 2. Format cleanly using WhatsApp Markdown (*bold*, bullet points, line breaks).
-3. Whenever the user asks to see groceries, wants to buy, or asks how to order, ALWAYS share their personalized 1-tap store link:
+3. If the user asks about specials, discounts, or deals, tell them about the 20% off fruits & veggies and FREE delivery over R 150!
+4. Whenever the user asks to see groceries, wants to buy, or asks how to order, ALWAYS share their personalized 1-tap store link:
    👉 ${storeLink}
-4. If the user tells you their order directly (e.g. "I want 2 milk and apples"), calculate the total price including delivery, tell them the total, and provide the store link to confirm delivery address.
-5. Keep answers concise, readable on a phone screen, and action-oriented.`;
+5. If the user tells you their order directly (e.g. "I want 2 milk and apples"), calculate the total price including delivery, tell them the total, and provide the store link to confirm delivery address.
+6. Keep answers concise, readable on a phone screen, and action-oriented.`;
 
   const messages = [
     { role: "system", content: systemPrompt },
@@ -379,6 +516,97 @@ async function sendWhatsAppTextMessage(phoneNumberId: string, to: string, text: 
     return data;
   } catch (err) {
     console.error("[Meta API Send Exception]", err);
+  }
+}
+
+async function sendWhatsAppReplyButtons(
+  phoneNumberId: string,
+  to: string,
+  bodyText: string,
+  buttons: Array<{ id: string; title: string }>
+) {
+  try {
+    const res = await fetch(`https://graph.facebook.com/v21.0/${phoneNumberId}/messages`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${META_ACCESS_TOKEN}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        messaging_product: "whatsapp",
+        recipient_type: "individual",
+        to,
+        type: "interactive",
+        interactive: {
+          type: "button",
+          body: {
+            text: bodyText,
+          },
+          action: {
+            buttons: buttons.slice(0, 3).map((b) => ({
+              type: "reply",
+              reply: {
+                id: b.id,
+                title: b.title.slice(0, 20),
+              },
+            })),
+          },
+        },
+      }),
+    });
+
+    const data = await res.json();
+    if (!res.ok) {
+      console.error("[Meta API Send Buttons Error]", res.status, JSON.stringify(data));
+      // Fallback: send text message with numbered options if interactive buttons fail
+      const fallbackText = `${bodyText}\n\n1️⃣ Place an order\n2️⃣ Track my order\n3️⃣ Help`;
+      await sendWhatsAppTextMessage(phoneNumberId, to, fallbackText);
+    } else {
+      console.log(`[WhatsApp Buttons Sent] To: ${to} MsgID: ${data.messages?.[0]?.id}`);
+    }
+    return data;
+  } catch (err) {
+    console.error("[Meta API Send Buttons Exception]", err);
+    await sendWhatsAppTextMessage(phoneNumberId, to, bodyText);
+  }
+}
+
+async function fetchRecentOrderByPhone(phone: string) {
+  try {
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/orders?phone=eq.${phone}&order=created_at.desc&limit=1`,
+      {
+        headers: {
+          apikey: SUPABASE_KEY,
+          Authorization: `Bearer ${SUPABASE_KEY}`,
+        },
+      }
+    );
+    if (!res.ok) return null;
+    const data = await res.json();
+    return Array.isArray(data) && data.length > 0 ? data[0] : null;
+  } catch {
+    return null;
+  }
+}
+
+async function fetchOrderById(orderId: string) {
+  try {
+    const clean = orderId.toUpperCase().trim();
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/orders?id=ilike.%25${encodeURIComponent(clean)}%25&order=created_at.desc&limit=1`,
+      {
+        headers: {
+          apikey: SUPABASE_KEY,
+          Authorization: `Bearer ${SUPABASE_KEY}`,
+        },
+      }
+    );
+    if (!res.ok) return null;
+    const data = await res.json();
+    return Array.isArray(data) && data.length > 0 ? data[0] : null;
+  } catch {
+    return null;
   }
 }
 
