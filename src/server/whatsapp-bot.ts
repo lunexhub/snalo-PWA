@@ -227,13 +227,46 @@ async function processIncomingWhatsAppPayload(payload: {
   const lower = userText.toLowerCase().trim();
   const storeLink = `${APP_URL}/?source=whatsapp&phone=${from}&name=${encodeURIComponent(customerName)}`;
 
-  // Flow A: Greeting / Hello / Menu / First Contact -> Send Interactive Reply Buttons
-  const isGreeting =
-    buttonId === "btn_menu" ||
-    /^(hi|hello|hey|howzit|hola|good\s*(morning|afternoon|evening)|start|menu|help me)$/i.test(lower) ||
-    (history.length === 0 && lower.length < 25);
+  // Flow B: Place an order (Button tapped or typed)
+  const isPlaceOrder =
+    buttonId === "btn_order" ||
+    lower === "place an order" ||
+    lower.includes("place an order") ||
+    lower === "order" ||
+    lower === "buy groceries" ||
+    lower === "place order" ||
+    lower === "shop";
 
-  if (isGreeting && buttonId !== "btn_order" && buttonId !== "btn_track" && buttonId !== "btn_help") {
+  // Flow C: Track my order (Button tapped or typed)
+  const isTrack =
+    buttonId === "btn_track" ||
+    lower === "track my order" ||
+    lower.includes("track my order") ||
+    lower.includes("track order") ||
+    lower === "tracking";
+
+  // Flow D: User replied with an order number (e.g. SN-8812, SN-TEST, or 4-digit code)
+  const orderRegex = /^(sn[-_]?[a-z0-9]+|\d{4,8})$/i;
+
+  // Flow E: Help / Support (Button tapped or typed)
+  const isHelp =
+    buttonId === "btn_help" ||
+    lower === "help" ||
+    lower === "support" ||
+    lower.includes("customer care") ||
+    lower === "agent";
+
+  // Flow A: Greeting / Hello / Menu -> Send Interactive Reply Buttons
+  const isGreeting =
+    !isPlaceOrder &&
+    !isTrack &&
+    !isHelp &&
+    !orderRegex.test(lower) &&
+    (buttonId === "btn_menu" ||
+      /\b(hi|hello|hey|howzit|hola|molo|dumelang|start|menu)\b/i.test(lower) ||
+      /^(good\s*(morning|afternoon|evening))$/i.test(lower));
+
+  if (isGreeting) {
     const greetingText = `Hi ${customerName}! 🛒 Welcome to Snalo Fast Delivery in Johannesburg.\n\nChoose below what you are interested in:`;
     const buttons = [
       { id: "btn_order", title: "Place an order" },
@@ -245,15 +278,6 @@ async function processIncomingWhatsAppPayload(payload: {
     await recordMessageInSupabase(from, customerName, "assistant", greetingText, phoneNumberId, { buttons });
     return;
   }
-
-  // Flow B: Place an order (Button tapped or typed)
-  const isPlaceOrder =
-    buttonId === "btn_order" ||
-    lower === "place an order" ||
-    lower === "order" ||
-    lower === "buy groceries" ||
-    lower === "place order" ||
-    lower === "shop";
 
   if (isPlaceOrder) {
     const orderPrompt = `🛒 *Welcome to Snalo Fast Delivery!*
@@ -269,13 +293,6 @@ Tap below to open your interactive store in 1 tap — your WhatsApp number is re
     await recordMessageInSupabase(from, customerName, "assistant", orderPrompt, phoneNumberId, null);
     return;
   }
-
-  // Flow C: Track my order (Button tapped or typed)
-  const isTrack =
-    buttonId === "btn_track" ||
-    lower === "track my order" ||
-    lower === "track order" ||
-    lower === "tracking";
 
   if (isTrack) {
     const recent = await fetchRecentOrderByPhone(from);
@@ -304,8 +321,6 @@ Please reply with your *Order Number* (e.g., *SN-1024* or your order digits) and
     return;
   }
 
-  // Flow D: User replied with an order number (e.g. SN-8812, SN-TEST, or 4-digit code)
-  const orderRegex = /^(sn[-_]?[a-z0-9]+|\d{4,8})$/i;
   if (orderRegex.test(lower)) {
     const order = await fetchOrderById(userText);
     let replyMsg = "";
@@ -329,14 +344,6 @@ Please check your confirmation message or order digits, or tap below to open the
     await recordMessageInSupabase(from, customerName, "assistant", replyMsg, phoneNumberId, null);
     return;
   }
-
-  // Flow E: Help / Support (Button tapped or typed)
-  const isHelp =
-    buttonId === "btn_help" ||
-    lower === "help" ||
-    lower === "support" ||
-    lower === "customer care" ||
-    lower === "agent";
 
   if (isHelp) {
     const helpMsg = `Need help or have questions about delivery? Our support team is here for you! 📞
