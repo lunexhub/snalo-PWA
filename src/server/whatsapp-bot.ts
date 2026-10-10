@@ -287,82 +287,82 @@ async function processIncomingWhatsAppPayload(payload: {
   }
 
   if (isPlaceOrder) {
-    const orderPrompt = `🛒 *Welcome to Snalo Fast Delivery!*
+    const bodyText = `Welcome to Snalo Fast Delivery in Johannesburg! 🛒\n\nTap the button below to open your store — recognized automatically with 0 login required.\n\n⚡ Delivery in 15–20 minutes to your door\n🎁 FREE delivery on orders above R 150!`;
 
-Tap below to open your interactive store in 1 tap — your WhatsApp number is recognized automatically with no login required:
-
-👉 ${storeLink}
-
-⚡ Pick your groceries and we deliver to your door in *15–20 minutes* across Johannesburg!
-🎁 *FREE delivery* on orders above R 150!`;
-
-    await sendWhatsAppTextMessage(phoneNumberId, from, orderPrompt);
-    await recordMessageInSupabase(from, customerName, "assistant", orderPrompt, phoneNumberId, null);
+    await sendWhatsAppCtaUrlButton(phoneNumberId, from, {
+      headerText: "🛒 Snalo Fast Delivery",
+      bodyText,
+      footerText: "Fast • Fresh • 15–20 Mins",
+      buttonText: "Open Store 🛒",
+      url: storeLink,
+    });
+    await recordMessageInSupabase(from, customerName, "assistant", `${bodyText}\n[Button: Open Store 🛒 -> ${storeLink}]`, phoneNumberId, { cta_url: storeLink });
     return;
   }
 
   if (isTrack) {
     const recent = await fetchRecentOrderByPhone(from);
-    let trackMessage = "";
-
     if (recent) {
-      trackMessage = `📦 *Your Recent Snalo Order #${recent.id}*
-━━━━━━━━━━━━━━━━━━
-📊 *Status:* ${String(recent.status || "On The Way").toUpperCase()}
-💵 *Total:* R ${recent.total || 0} (${recent.payment_method || "COD"})
-📍 *Address:* ${recent.delivery_address || "Johannesburg"}
-⏱ *Delivery Speed:* 15–20 Mins by John Rider
+      const trackingUrl = `${APP_URL}/?screen=tracking&order=${recent.id}`;
+      const bodyText = `📦 *Your Recent Snalo Order #${recent.id}*\n━━━━━━━━━━━━━━━━━━\n📊 *Status:* ${String(recent.status || "On The Way").toUpperCase()}\n💵 *Total:* R ${recent.total || 0} (${recent.payment_method || "COD"})\n📍 *Address:* ${recent.delivery_address || "Johannesburg"}\n⏱ *Delivery Speed:* 15–20 Mins by John Rider\n\nTap below to view live GPS tracking on map!`;
 
-Live tracking on map:
-👉 ${APP_URL}/?screen=tracking&order=${recent.id}
-
-Have another order number? Just reply with it (e.g. *SN-1024*)!`;
+      await sendWhatsAppCtaUrlButton(phoneNumberId, from, {
+        headerText: `📦 Order #${recent.id}`,
+        bodyText,
+        footerText: "Live GPS Tracking",
+        buttonText: "Track on Map 📍",
+        url: trackingUrl,
+      });
+      await recordMessageInSupabase(from, customerName, "assistant", bodyText, phoneNumberId, { trackingUrl });
+      return;
     } else {
-      trackMessage = `📦 *Track Your Snalo Order*
-
-Please reply with your *Order Number* (e.g., *SN-1024* or your order digits) and I'll find its live delivery status for you right away!`;
+      const trackMessage = `📦 *Track Your Snalo Order*\n\nPlease reply with your *Order Number* (e.g., *SN-1024* or your order digits) and I'll find its live delivery status for you right away!`;
+      await sendWhatsAppTextMessage(phoneNumberId, from, trackMessage);
+      await recordMessageInSupabase(from, customerName, "assistant", trackMessage, phoneNumberId, null);
+      return;
     }
-
-    await sendWhatsAppTextMessage(phoneNumberId, from, trackMessage);
-    await recordMessageInSupabase(from, customerName, "assistant", trackMessage, phoneNumberId, null);
-    return;
   }
 
   if (matchedOrderId) {
     const order = await fetchOrderById(matchedOrderId);
-    let replyMsg = "";
     if (order) {
-      replyMsg = `📦 *Order #${order.id} Found!*
-━━━━━━━━━━━━━━━━━━
-📊 *Status:* ${String(order.status || "Placed").toUpperCase()}
-💵 *Total:* R ${order.total || 0} (${order.payment_method || "COD"})
-📍 *Address:* ${order.delivery_address || "Johannesburg"}
-⏱ *Estimated Arrival:* 15–20 Mins
+      const trackingUrl = `${APP_URL}/?screen=tracking&order=${order.id}`;
+      const bodyText = `📦 *Order #${order.id} Found!*\n━━━━━━━━━━━━━━━━━━\n📊 *Status:* ${String(order.status || "Placed").toUpperCase()}\n💵 *Total:* R ${order.total || 0} (${order.payment_method || "COD"})\n📍 *Address:* ${order.delivery_address || "Johannesburg"}\n⏱ *Estimated Arrival:* 15–20 Mins\n\nTap below to view live GPS tracking on map:`;
 
-Live GPS map tracking:
-👉 ${APP_URL}/?screen=tracking&order=${order.id}`;
+      await sendWhatsAppCtaUrlButton(phoneNumberId, from, {
+        headerText: `📦 Order #${order.id}`,
+        bodyText,
+        footerText: "Snalo Delivery GPS",
+        buttonText: "Track on Map 📍",
+        url: trackingUrl,
+      });
+      await recordMessageInSupabase(from, customerName, "assistant", bodyText, phoneNumberId, { trackingUrl });
+      return;
     } else {
-      replyMsg = `We couldn't find order *#${matchedOrderId.toUpperCase()}*.
-
-Please check your confirmation message or order digits, or tap below to open the store:
-👉 ${storeLink}`;
+      const notFoundMsg = `We couldn't find order *#${matchedOrderId.toUpperCase()}*.\n\nPlease check your confirmation message or order digits, or tap below to open the store:`;
+      await sendWhatsAppCtaUrlButton(phoneNumberId, from, {
+        headerText: "Order Not Found",
+        bodyText: notFoundMsg,
+        buttonText: "Open Store 🛒",
+        url: storeLink,
+      });
+      await recordMessageInSupabase(from, customerName, "assistant", notFoundMsg, phoneNumberId, null);
+      return;
     }
-    await sendWhatsAppTextMessage(phoneNumberId, from, replyMsg);
-    await recordMessageInSupabase(from, customerName, "assistant", replyMsg, phoneNumberId, null);
-    return;
   }
 
   if (isHelp) {
-    const helpMsg = `Need help or have questions about delivery? Our support team is here for you! 📞
+    const helpMsg = `Need help or have questions about delivery? Our support team is here for you! 📞\n\nTap below to chat directly with our support team on WhatsApp:\n\nOr call us anytime at: *+27 71 876 5434*\n🕒 *Customer Support Hours:* 7:00 AM – 10:00 PM`;
+    const supportLink = `https://wa.me/${BOT_PHONE_NUMBER}?text=${encodeURIComponent(`Hi Snalo Support, I need assistance (Customer Phone: ${from})`)}`;
 
-Click below to chat directly with our support team on WhatsApp:
-👉 https://wa.me/${BOT_PHONE_NUMBER}?text=${encodeURIComponent(`Hi Snalo Support, I need assistance (Customer Phone: ${from})`)}
-
-Or call us anytime at: *+27 71 876 5434*
-🕒 *Customer Support Hours:* 7:00 AM – 10:00 PM`;
-
-    await sendWhatsAppTextMessage(phoneNumberId, from, helpMsg);
-    await recordMessageInSupabase(from, customerName, "assistant", helpMsg, phoneNumberId, null);
+    await sendWhatsAppCtaUrlButton(phoneNumberId, from, {
+      headerText: "📞 Customer Support",
+      bodyText: helpMsg,
+      footerText: "Snalo Support Team",
+      buttonText: "Chat Support 💬",
+      url: supportLink,
+    });
+    await recordMessageInSupabase(from, customerName, "assistant", helpMsg, phoneNumberId, { supportLink });
     return;
   }
 
@@ -585,6 +585,77 @@ async function sendWhatsAppReplyButtons(
   }
 }
 
+async function sendWhatsAppCtaUrlButton(
+  phoneNumberId: string,
+  to: string,
+  options: {
+    headerText?: string;
+    bodyText: string;
+    footerText?: string;
+    buttonText: string;
+    url: string;
+  }
+) {
+  try {
+    const payload: Record<string, unknown> = {
+      messaging_product: "whatsapp",
+      recipient_type: "individual",
+      to,
+      type: "interactive",
+      interactive: {
+        type: "cta_url",
+        body: {
+          text: options.bodyText,
+        },
+        action: {
+          name: "cta_url",
+          parameters: {
+            display_text: options.buttonText.slice(0, 20),
+            url: options.url,
+          },
+        },
+      },
+    };
+
+    if (options.headerText) {
+      (payload.interactive as Record<string, unknown>).header = {
+        type: "text",
+        text: options.headerText.slice(0, 60),
+      };
+    }
+
+    if (options.footerText) {
+      (payload.interactive as Record<string, unknown>).footer = {
+        text: options.footerText.slice(0, 60),
+      };
+    }
+
+    const res = await fetch(`https://graph.facebook.com/v21.0/${phoneNumberId}/messages`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${META_ACCESS_TOKEN}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    });
+
+    const data = await res.json();
+    if (!res.ok) {
+      console.error("[Meta API Send CTA Error]", res.status, JSON.stringify(data));
+      // Fallback: send text message with raw link
+      const fallback = `${options.bodyText}\n\n👉 ${options.url}`;
+      await sendWhatsAppTextMessage(phoneNumberId, to, fallback);
+    } else {
+      console.log(`[WhatsApp CTA Sent] To: ${to} MsgID: ${data.messages?.[0]?.id}`);
+    }
+    return data;
+  } catch (err) {
+    console.error("[Meta API Send CTA Exception]", err);
+    const fallback = `${options.bodyText}\n\n👉 ${options.url}`;
+    await sendWhatsAppTextMessage(phoneNumberId, to, fallback);
+  }
+}
+
 async function fetchRecentOrderByPhone(phone: string) {
   try {
     const cleanPhone = phone.replace(/\D/g, "");
@@ -643,21 +714,16 @@ async function sendOrderConfirmationToCustomer(order: {
     .map((item) => `• ${item.name} x${item.quantity}`)
     .join("\n");
 
-  const message = `🎉 *Order Confirmed! #${orderId}*
-━━━━━━━━━━━━━━━━━━
-Thank you ${order.customerName || "Customer"}! We received your order.
+  const bodyText = `Thank you ${order.customerName || "Customer"}! We received your order.\n\n*Items:*\n${itemsText || "• Fresh Groceries"}\n\n💵 *Total:* R ${order.total || 0} (${order.paymentMethod || "COD"})\n📍 *Address:* ${order.address || "Johannesburg"}\n⏱ *Estimated Delivery:* 15–20 Mins by John Rider`;
+  const trackingUrl = `${APP_URL}/?screen=tracking&order=${orderId}`;
 
-*Items:*
-${itemsText || "• Fresh Groceries"}
-
-💵 *Total:* R ${order.total || 0} (${order.paymentMethod || "COD"})
-📍 *Address:* ${order.address || "Johannesburg"}
-⏱ *Estimated Delivery:* 15–20 Mins by John Rider
-
-Live tracking link:
-👉 ${APP_URL}/?screen=tracking&order=${orderId}`;
-
-  await sendWhatsAppTextMessage(lastKnownPhoneNumberId, order.customerPhone, message);
+  await sendWhatsAppCtaUrlButton(lastKnownPhoneNumberId, order.customerPhone, {
+    headerText: `🎉 Order Confirmed! #${orderId}`,
+    bodyText,
+    footerText: "Fast Delivery • 15–20 Mins",
+    buttonText: "Track Live Order 🛵",
+    url: trackingUrl,
+  });
 }
 
 async function recordMessageInSupabase(
