@@ -783,6 +783,13 @@ function Checkout({
           "*"
         );
       } catch (e) {}
+
+      // Save order to backend Supabase database
+      fetch("/api/order", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(orderData),
+      }).catch((e) => console.error("Order sync error", e));
     }
 
     // 2. Open WhatsApp if requested or if WhatsApp pay selected
